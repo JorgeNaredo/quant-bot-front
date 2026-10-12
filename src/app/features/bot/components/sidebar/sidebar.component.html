@@ -1,0 +1,168 @@
+<aside class="sidebar">
+  <button type="button" class="sidebar__toggle" (click)="onToggle()">
+    ☰
+  </button>
+
+  @if (!collapsed()) {
+    <div class="sidebar__body">
+      <section class="sidebar__actions">
+        <button
+          type="button"
+          class="btn"
+          [class.btn--primary]="!connected"
+          [class.btn--secondary]="connected"
+          (click)="onAction()"
+        >
+          @if (connected) {
+            ■ Desconectar
+          } @else {
+            ▶ Conectar
+          }
+        </button>
+      </section>
+
+      <section class="sidebar__account">
+        <h3>Cuenta</h3>
+        @if (accountInfo; as acc) {
+          <div class="account__grid">
+            <span class="account__label">Saldo</span>
+            <span class="account__value">{{ isFiniteNum(acc.balance) ? '$' + acc.balance.toFixed(2) : '—' }}</span>
+
+            <span class="account__label">Equity</span>
+            <span class="account__value">{{ isFiniteNum(acc.equity) ? '$' + acc.equity.toFixed(2) : '—' }}</span>
+
+            <span class="account__label">P&L</span>
+            <span
+              class="account__value"
+              [class.pnl--positive]="isFiniteNum(acc.unrealizedPL) && acc.unrealizedPL >= 0"
+              [class.pnl--negative]="isFiniteNum(acc.unrealizedPL) && acc.unrealizedPL < 0"
+            >
+              @if (isFiniteNum(acc.unrealizedPL)) {
+                @if (acc.unrealizedPL >= 0) {
+                  ▲ +${{ acc.unrealizedPL.toFixed(2) }}
+                } @else {
+                  ▼ -${{ formatAmount(acc.unrealizedPL) }}
+                }
+              } @else {
+                —
+              }
+            </span>
+
+            <span class="account__label">Spread</span>
+            <span class="account__value">{{ isFiniteNum(acc.spread) ? (acc.spread * 100).toFixed(3) + '%' : '—' }}</span>
+
+            <span class="account__label">Comisión</span>
+            <span class="account__value">{{ isFiniteNum(acc.commission) ? '$' + acc.commission.toFixed(2) : '—' }}</span>
+
+            <span class="account__label">Colateral</span>
+            <span class="account__value">{{ isFiniteNum(acc.collateral) ? '$' + acc.collateral.toFixed(2) : '—' }}</span>
+          </div>
+        } @else {
+          <p class="account__empty">Conecta para ver datos</p>
+        }
+      </section>
+
+      <section class="sidebar__profit">
+        <h3>P&L ASEGURADO X SL</h3>
+        @if (profitLocked !== null) {
+          <div
+            class="profit__value"
+            [class.profit--positive]="isFiniteNum(profitLocked) && profitLocked >= 0"
+            [class.profit--negative]="isFiniteNum(profitLocked) && profitLocked < 0"
+          >
+            @if (isFiniteNum(profitLocked)) {
+              @if (profitLocked >= 0) {
+                ▲ +${{ profitLocked.toFixed(2) }}
+              } @else {
+                ▼ -${{ formatAmount(profitLocked) }}
+              }
+            } @else {
+              —
+            }
+          </div>
+        } @else {
+          <p class="profit__empty">Sin posición abierta</p>
+        }
+      </section>
+
+      <section class="sidebar__stats">
+        <h3>Estadísticas</h3>
+        @if (closeStats; as stats) {
+          <div class="stats__grid">
+            <span class="stats__label" title="Total de operaciones ganadoras">Ganadas</span>
+            <span class="stats__value stats__value--win">{{ stats.winCount }}</span>
+
+            <span class="stats__label" title="Total de operaciones perdedoras">Perdidas</span>
+            <span class="stats__value stats__value--loss">{{ stats.lossCount }}</span>
+
+            <span class="stats__label" title="Porcentaje de trades ganadores sobre el total">Win Rate</span>
+            <span class="stats__value stats__value--win">
+              {{ stats.winCount + stats.lossCount > 0
+                ? (stats.winCount / (stats.winCount + stats.lossCount) * 100).toFixed(1) + '%'
+                : '—' }}
+            </span>
+
+            <span class="stats__label" title="Ganancia promedio por trade ganador">Avg Win</span>
+            <span class="stats__value stats__value--win">
+              {{ stats.totalWinPnl != null && stats.winCount > 0
+                ? '+$' + (stats.totalWinPnl / stats.winCount).toFixed(2)
+                : '—' }}
+            </span>
+
+            <span class="stats__label" title="Pérdida promedio por trade perdedor">Avg Loss</span>
+            <span class="stats__value stats__value--loss">
+              {{ stats.totalLossPnl != null && stats.lossCount > 0
+                ? '-$' + formatAmount(stats.totalLossPnl / stats.lossCount)
+                : '—' }}
+            </span>
+
+<span class="stats__label" title="Veces que la posición fue liquidada">Liquidaciones</span>
+             <span class="stats__value stats__value--loss">{{ stats.liquidationCount }}</span>
+
+<span class="stats__label" title="Suma total de P&L realizado (ganancias - pérdidas)">P&L Bruto</span>
+             <span
+               class="stats__value"
+               [class.stats__value--win]="isFiniteNum(stats.totalRealizedPnl) && stats.totalRealizedPnl >= 0"
+               [class.stats__value--loss]="isFiniteNum(stats.totalRealizedPnl) && stats.totalRealizedPnl < 0"
+             >
+               @if (isFiniteNum(stats.totalRealizedPnl)) {
+                 @if (stats.totalRealizedPnl >= 0) {
+                   ▲ +${{ stats.totalRealizedPnl.toFixed(2) }}
+                 } @else {
+                   ▼ -${{ formatAmount(stats.totalRealizedPnl) }}
+                 }
+               } @else {
+                 —
+               }
+             </span>
+             @if (pnlNeto !== null) {
+               <span class="stats__label" title="P&L Realizado menos comisiones totales">P&L Neto</span>
+               <span
+                 class="stats__value"
+                 [class.stats__value--win]="isFiniteNum(pnlNeto) && pnlNeto >= 0"
+                 [class.stats__value--loss]="isFiniteNum(pnlNeto) && pnlNeto < 0"
+               >
+                 @if (isFiniteNum(pnlNeto)) {
+                   @if (pnlNeto >= 0) {
+                     ▲ +${{ pnlNeto.toFixed(2) }}
+                   } @else {
+                     ▼ -${{ formatAmount(pnlNeto) }}
+                   }
+                 } @else {
+                   —
+                 }
+               </span>
+             }
+           </div>
+         } @else {
+           <p class="stats__empty">Conecta para ver datos</p>
+         }
+       </section>
+
+      <section class="sidebar__broker">
+        <h3>Broker</h3>
+        <p class="broker__placeholder">Información adicional próximamente</p>
+      </section>
+    </div>
+  }
+</aside>

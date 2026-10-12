@@ -1,0 +1,21 @@
+<div class="layout">
+  <app-sidebar
+    class="layout__sidebar"
+    [connected]="connected()"
+    [accountInfo]="accountInfo()"
+    [closeStats]="closeStats()"
+    [profitLocked]="profitLocked()"
+    (connect)="connect()"
+    (disconnect)="disconnect()"
+  />
+  <main class="layout__main">
+    <app-chart-view
+      class="layout__chart"
+      [breakEvenPrice]="breakEvenPrice()"
+    />
+    <app-dashboard-panel
+      class="layout__dashboard"
+      [connected]="connected()"
+    />
+  </main>
+</div>
