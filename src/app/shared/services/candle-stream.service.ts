@@ -1,56 +1,41 @@
-import { Injectable, NgZone, OnDestroy } from '@angular/core';
-import { Observable, Subject } from 'rxjs';
+import { Injectable, NgZone, OnDestroy, inject } from '@angular/core';
+import { Observable, map } from 'rxjs';
 import { Candle } from '../models/candle.model';
+import { CandleDto } from '../models/bot-api.model';
+import { BackendConfigService } from './backend-config.service';
+import { SseClient } from './sse-client';
 
 @Injectable({ providedIn: 'root' })
 export class CandleStreamService implements OnDestroy {
-  private readonly candleSubject = new Subject<Candle>();
-  private eventSource: EventSource | null = null;
+  private readonly config = inject(BackendConfigService);
+  private readonly client: SseClient<CandleDto>;
 
-  constructor(private readonly zone: NgZone) {}
+  constructor(zone: NgZone) {
+    this.client = new SseClient<CandleDto>(zone);
+  }
 
   get candles$(): Observable<Candle> {
-    return this.candleSubject.asObservable();
+    return this.client.stream$.pipe(
+      map((dto) => ({
+        timestamp: dto.openTime,
+        open: Number(dto.open),
+        high: Number(dto.high),
+        low: Number(dto.low),
+        close: Number(dto.close),
+        volume: Number(dto.volume),
+      })),
+    );
   }
 
   start(): void {
-    this.stop();
-    this.retryConnect();
-  }
-
-  private retryConnect(): void {
-    fetch('http://localhost:8080/api/v1/account', { method: 'HEAD' })
-      .then(() => this.createEventSource())
-      .catch(() => setTimeout(() => this.retryConnect(), 2000));
-  }
-
-  private createEventSource(): void {
-    const url = 'http://localhost:8080/api/v1/market-data/stream';
-    this.eventSource = new EventSource(url);
-
-    this.eventSource.addEventListener('candle', (event: MessageEvent) => {
-      try {
-        const candle = JSON.parse(event.data) as Candle;
-        this.zone.run(() => this.candleSubject.next(candle));
-      } catch (err) {
-        console.error('Failed to parse candle payload', err, event.data);
-      }
-    });
-
-    this.eventSource.onerror = () => {
-      console.warn('Candle SSE connection lost, auto-reconnecting...');
-    };
+    this.client.start(`${this.config.url}/market/klines/stream`, 'candle');
   }
 
   stop(): void {
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
-    }
+    this.client.stop();
   }
 
   ngOnDestroy(): void {
-    this.stop();
-    this.candleSubject.complete();
+    this.client.complete();
   }
 }

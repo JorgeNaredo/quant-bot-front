@@ -1,0 +1,129 @@
+<div class="bt">
+  <header class="bt__header">
+    <div>
+      <h1>Backtest</h1>
+      @if (session(); as s) {
+        <p class="bt__meta">{{ s.symbol }} · {{ s.interval }} · {{ s.state }}</p>
+      }
+    </div>
+    <div class="bt__actions">
+      <button type="button" class="btn btn--primary" [disabled]="busy()" (click)="run()">
+        @if (busy()) { Evaluando… } @else { Lanzar evaluación }
+      </button>
+      <button type="button" class="btn" [disabled]="busy()" (click)="loadLatest()">Cargar último informe</button>
+      <button type="button" class="btn btn--ghost" (click)="disconnect()">Cambiar backend</button>
+    </div>
+  </header>
+
+  @if (error(); as err) {
+    <p class="bt__error">{{ err }}</p>
+  }
+
+  @if (evaluation(); as doc) {
+    <section class="bt__section">
+      <h2>Resultado</h2>
+      <div class="table">
+        <div class="table__head">
+          <span>Estrategia</span><span>Veredicto</span><span>Piso train</span><span>Piso OOS</span>
+        </div>
+        @for (row of strategies('train'); track row.id) {
+          <div class="table__row">
+            <span>{{ row.id }}</span>
+            <span class="tag">{{ verdict(row.id) }}</span>
+            <span>{{ grade(row, 'floor') }}</span>
+            <span>{{ oosFloor(row.id) }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="bt__section">
+      <div class="bt__row">
+        <h2>Train / OOS</h2>
+        <div class="bt__tabs">
+          <button type="button" [class.active]="detailSplit() === 'train'" (click)="detailSplit.set('train')">Train</button>
+          <button type="button" [class.active]="detailSplit() === 'walkForward'" (click)="detailSplit.set('walkForward')">Walk-forward</button>
+        </div>
+      </div>
+      <div class="table">
+        <div class="table__head table__head--metrics">
+          <span>Estrategia</span><span>Piso</span><span>DSR</span><span>E[R]</span><span>PF</span><span>DD%</span><span>Trades</span><span>Ret%</span>
+        </div>
+        @for (row of strategies(detailSplit()); track row.id) {
+          <div class="table__row table__row--metrics">
+            <span>{{ row.id }}</span>
+            <span>{{ grade(row, 'floor') }}</span>
+            <span>{{ grade(row, 'deflatedSharpe') }} {{ row.deflatedSharpe | number:'1.2-2' }}</span>
+            <span>{{ grade(row, 'expectancyR') }} {{ row.expectancyR | number:'1.2-2' }}</span>
+            <span>{{ grade(row, 'profitFactor') }} {{ row.profitFactor | number:'1.2-2' }}</span>
+            <span>{{ grade(row, 'maxDrawdownPct') }} {{ row.maxDrawdownPct | number:'1.1-1' }}</span>
+            <span>{{ row.closedTrades ?? 0 }}</span>
+            <span>{{ row.returnPct | number:'1.1-1' }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="bt__section">
+      <div class="bt__row">
+        <h2>Ganancias por mes (IS / OOS)</h2>
+        <select [ngModel]="selectedStrategy()" (ngModelChange)="onStrategyChange($event)">
+          @for (id of strategyIds(); track id) {
+            <option [value]="id">{{ id }}</option>
+          }
+        </select>
+      </div>
+      <div #monthChart class="bt__chart"></div>
+      <p class="bt__legend"><span class="swatch swatch--is"></span> IS (train) <span class="swatch swatch--oos"></span> OOS</p>
+    </section>
+
+    <section class="bt__section">
+      <h2>Stages ({{ detailSplit() }})</h2>
+      @for (row of strategies(detailSplit()); track row.id) {
+        <details class="stages">
+          <summary>{{ row.id }}</summary>
+          <div class="stages__grid">
+            <div>
+              <h4>Long</h4>
+              @for (st of row.stages?.long ?? []; track $index) {
+                <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
+              }
+              <p>invalidated {{ row.stages?.invalidated?.long ?? 0 }}</p>
+            </div>
+            <div>
+              <h4>Short</h4>
+              @for (st of row.stages?.short ?? []; track $index) {
+                <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
+              }
+              <p>invalidated {{ row.stages?.invalidated?.short ?? 0 }}</p>
+            </div>
+          </div>
+        </details>
+      }
+    </section>
+
+    <section class="bt__section">
+      <h2>Trades ({{ detailSplit() }} · {{ selectedStrategy() }})</h2>
+      <div class="table table--trades">
+        <div class="table__head table__head--trades">
+          <span>Strat</span><span>Side</span><span>Entry</span><span>Exit</span><span>PnL</span><span>R</span><span>Reason</span>
+        </div>
+        @for (t of trades(detailSplit()); track $index) {
+          <div class="table__row table__row--trades">
+            <span>{{ t.strategyId }}</span>
+            <span>{{ t.side }}</span>
+            <span>{{ t.entryTime }}</span>
+            <span>{{ t.exitTime }}</span>
+            <span [class.pos]="(t.netPnl ?? 0) >= 0" [class.neg]="(t.netPnl ?? 0) < 0">{{ t.netPnl | number:'1.2-2' }}</span>
+            <span>{{ t.netR | number:'1.2-2' }}</span>
+            <span>{{ t.reason }}</span>
+          </div>
+        } @empty {
+          <p class="empty">Sin trades</p>
+        }
+      </div>
+    </section>
+  } @else {
+    <p class="bt__empty">Lanza la evaluación o carga el último informe.</p>
+  }
+</div>

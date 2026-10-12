@@ -97,6 +97,24 @@
   color: var(--text);
 }
 
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sidebar__profile,
+.sidebar__state {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.sidebar__error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #ef5350;
+}
+
 /* ── Account ── */
 
 .sidebar__account h3,

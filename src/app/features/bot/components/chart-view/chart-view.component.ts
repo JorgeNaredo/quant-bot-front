@@ -20,9 +20,9 @@ import {
 } from 'lightweight-charts';
 import { Subscription } from 'rxjs';
 import { CandleStreamService } from '../../../../shared/services/candle-stream.service';
-import { OrderStreamService } from '../../../../shared/services/order-stream.service';
+import { BookStreamService } from '../../../../shared/services/book-stream.service';
 import { Candle } from '../../../../shared/models/candle.model';
-import { ExecutionReport } from '../../../../shared/models/execution-report.model';
+import { BookEvent } from '../../../../shared/models/bot-api.model';
 
 const PRICE_PRECISION = 5;
 const PRICE_MIN_MOVE = 0.00001;
@@ -57,7 +57,7 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   }
 
   private readonly candleStream = inject(CandleStreamService);
-  private readonly orderStream = inject(OrderStreamService);
+  private readonly bookStream = inject(BookStreamService);
 
   private chart: IChartApi | null = null;
   private series: ISeriesApi<'Candlestick'> | null = null;
@@ -153,61 +153,59 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   }
 
   private subscribeToOrders(): void {
-    this.orderSub = this.orderStream.execution$.subscribe((report) => {
-      this.handleExecution(report);
+    this.orderSub = this.bookStream.events$.subscribe((event) => {
+      this.handleBookEvent(event);
     });
   }
 
-  private handleExecution(report: ExecutionReport): void {
-    switch (report.type) {
-      case 'ORDER_FILLED':
-        this.drawOrderLines(report);
+  private handleBookEvent(event: BookEvent): void {
+    switch (event.type) {
+      case 'OPEN':
+        this.drawOrderLines(event);
         break;
-      case 'STOP_LOSS_UPDATED':
-        this.updateStopLossLine(report);
+      case 'UPDATE_STOP':
+        this.updateStopLossLine(event);
         break;
-      case 'STOP_LOSS_HIT':
-      case 'TAKE_PROFIT_HIT':
-      case 'ORDER_CANCELLED':
-      case 'LIQUIDATED':
-      case 'POSITION_CLOSED':
-        this.extendEntryLinesToClose(report);
+      case 'CLOSE':
+        this.extendEntryLinesToClose();
         break;
     }
   }
 
-  private updateStopLossLine(report: ExecutionReport): void {
-    if (!this.orderLines || !this.activePosition) return;
+  private updateStopLossLine(event: BookEvent): void {
+    if (!this.orderLines || !this.activePosition || event.stopPrice == null) return;
 
-    this.activePosition.slPrice = report.stopLoss;
-    this.orderLines.stopLoss.applyOptions({ price: report.stopLoss });
+    this.activePosition.slPrice = event.stopPrice;
+    this.orderLines.stopLoss.applyOptions({ price: event.stopPrice });
   }
 
-  private drawOrderLines(report: ExecutionReport): void {
+  private drawOrderLines(event: BookEvent): void {
     this.removeOrderLines();
     this.clearExtendTimer();
 
-    if (!this.series) return;
+    if (!this.series || event.entryPrice == null) return;
 
-    const time = this.latestCandleTime ?? this.toTimeFromMs(report.timestamp);
+    const time = this.latestCandleTime ?? this.toTime(event.ts);
+    const stop = event.stopPrice ?? event.entryPrice;
+    const target = event.targetPrice ?? event.entryPrice;
 
     this.orderLines = {
       entry: this.series.createPriceLine({
-        price: report.price,
+        price: event.entryPrice,
         color: '#ffd54f',
         lineWidth: 2,
         lineStyle: LineStyle.Solid,
         axisLabelVisible: true,
       }),
       stopLoss: this.series.createPriceLine({
-        price: report.stopLoss,
+        price: stop,
         color: '#ef5350',
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
       }),
       takeProfit: this.series.createPriceLine({
-        price: report.takeProfit,
+        price: target,
         color: '#26a69a',
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
@@ -217,13 +215,13 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
 
     this.activePosition = {
       entryTime: time,
-      entryPrice: report.price,
-      slPrice: report.stopLoss,
-      tpPrice: report.takeProfit,
+      entryPrice: event.entryPrice,
+      slPrice: stop,
+      tpPrice: target,
     };
 
     this.drawBreakEvenLine();
-    this.followPrice(report.price);
+    this.followPrice(event.entryPrice);
   }
 
   private drawBreakEvenLine(): void {
@@ -249,7 +247,7 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private extendEntryLinesToClose(_report: ExecutionReport): void {
+  private extendEntryLinesToClose(): void {
     if (!this.activePosition) {
       this.removeOrderLines();
       return;

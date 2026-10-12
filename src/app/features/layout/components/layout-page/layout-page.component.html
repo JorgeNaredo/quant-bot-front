@@ -1,12 +1,17 @@
 <div class="layout">
   <app-sidebar
     class="layout__sidebar"
-    [connected]="connected()"
+    [connected]="streamsOpen()"
+    [operating]="operating()"
     [accountInfo]="accountInfo()"
-    [closeStats]="closeStats()"
     [profitLocked]="profitLocked()"
-    (connect)="connect()"
-    (disconnect)="disconnect()"
+    [profile]="profile()"
+    [symbol]="symbol()"
+    [busy]="busy()"
+    [error]="error()"
+    (startBot)="startBot()"
+    (stopBot)="stopBot()"
+    (changeBackend)="changeBackend()"
   />
   <main class="layout__main">
     <app-chart-view
@@ -15,7 +20,7 @@
     />
     <app-dashboard-panel
       class="layout__dashboard"
-      [connected]="connected()"
+      [connected]="streamsOpen()"
     />
   </main>
 </div>

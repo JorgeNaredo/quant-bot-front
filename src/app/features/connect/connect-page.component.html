@@ -1,0 +1,33 @@
+<div class="connect">
+  <div class="connect__card">
+    <h1 class="connect__title">Algotrade</h1>
+    <p class="connect__lead">Introduce la dirección del backend del bot.</p>
+
+    <label class="connect__label" for="backendUrl">URL o host:puerto</label>
+    <input
+      id="backendUrl"
+      class="connect__input"
+      type="text"
+      [(ngModel)]="url"
+      placeholder="http://localhost:8080"
+      (keyup.enter)="connect()"
+    />
+
+    @if (error(); as err) {
+      <p class="connect__error">{{ err }}</p>
+    }
+
+    <button
+      type="button"
+      class="connect__btn"
+      [disabled]="busy()"
+      (click)="connect()"
+    >
+      @if (busy()) {
+        Conectando…
+      } @else {
+        Conectar
+      }
+    </button>
+  </div>
+</div>

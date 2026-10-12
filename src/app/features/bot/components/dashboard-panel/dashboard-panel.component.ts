@@ -2,21 +2,28 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnDestroy,
-  computed,
   effect,
   inject,
   input,
   signal,
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { Subscription, interval, map, startWith } from 'rxjs';
-import { MarketBias, MarketDirection, PriceAnalysis, VolatilityState } from '../../../../shared/models/analysis.model';
-import { Order } from '../../../../shared/models/order.model';
-import { ExecutionReport } from '../../../../shared/models/execution-report.model';
-import { AnalysisStreamService } from '../../../../shared/services/analysis-stream.service';
-import { OrderStreamService } from '../../../../shared/services/order-stream.service';
-import { DecisionStreamService } from '../../../../shared/services/decision-stream.service';
-import { DecisionMade } from '../../../../shared/models/decision-made.model';
+import { Subscription } from 'rxjs';
+import { BookEvent, SpecState } from '../../../../shared/models/bot-api.model';
+import { BookStreamService } from '../../../../shared/services/book-stream.service';
+import { SpecsStreamService } from '../../../../shared/services/specs-stream.service';
+
+interface OrderRow {
+  id: string;
+  strategyId: string;
+  side: string;
+  status: string;
+  price: number;
+  size: number;
+  stop?: number | null;
+  target?: number | null;
+  pnl?: number | null;
+}
 
 @Component({
   selector: 'app-dashboard-panel',
@@ -29,50 +36,22 @@ import { DecisionMade } from '../../../../shared/models/decision-made.model';
 export class DashboardPanelComponent implements OnDestroy {
   readonly connected = input(false);
 
-  private readonly analysisStream = inject(AnalysisStreamService);
-  private readonly orderStream = inject(OrderStreamService);
-  private readonly decisionStream = inject(DecisionStreamService);
+  private readonly specsStream = inject(SpecsStreamService);
+  private readonly bookStream = inject(BookStreamService);
 
-  protected readonly analysis = signal<PriceAnalysis | null>(null);
-  protected readonly decisions = signal<DecisionMade[]>([]);
-  protected readonly orders = signal<Order[]>([]);
-  protected readonly ordersLoading = signal(false);
-  protected readonly elapsedSeconds = signal(0);
-  protected readonly activeOrders = computed(() =>
-    this.orders().filter(o => o.status === 'ORDER_ACCEPTED' || o.status === 'ORDER_FILLED')
-  );
-  protected readonly closedOrders = computed(() =>
-    this.orders().filter(o => o.status === 'ORDER_CANCELLED' || o.status === 'ORDER_EXPIRED' || o.status === 'STOP_LOSS_HIT' || o.status === 'TAKE_PROFIT_HIT' || o.status === 'LIQUIDATED' || o.status === 'POSITION_CLOSED')
-  );
-  protected readonly activeTab = signal(0);
-  protected readonly expandedSections = signal<Set<string>>(new Set(['señal', 'regimen']));
+  protected readonly specs = signal<SpecState[]>([]);
+  protected readonly decisions = signal<BookEvent[]>([]);
+  protected readonly activeOrders = signal<OrderRow[]>([]);
+  protected readonly closedOrders = signal<OrderRow[]>([]);
 
-  protected toggleSection(section: string): void {
-    this.expandedSections.update(prev => {
-      const next = new Set(prev);
-      if (next.has(section)) next.delete(section); else next.add(section);
-      return next;
-    });
-  }
-
-  protected isExpanded(section: string): boolean {
-    return this.expandedSections().has(section);
-  }
-
-  private readonly orderMap = new Map<string, Order>();
-
-  private analysisSub: Subscription | null = null;
-  private orderSub: Subscription | null = null;
-  private decisionSub: Subscription | null = null;
-  private timerSub: Subscription | null = null;
-  private lastUpdateTs = 0;
+  private specsSub: Subscription | null = null;
+  private bookSub: Subscription | null = null;
+  private readonly openByStrategy = new Map<string, OrderRow>();
 
   constructor() {
     effect(() => {
       if (this.connected()) {
-        this.startAnalysisListening();
-        this.startDecisionListening();
-        this.startOrderListening();
+        this.startListening();
       } else {
         this.clearAll();
       }
@@ -80,221 +59,95 @@ export class DashboardPanelComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.analysisSub?.unsubscribe();
-    this.orderSub?.unsubscribe();
-    this.decisionSub?.unsubscribe();
-    this.timerSub?.unsubscribe();
+    this.specsSub?.unsubscribe();
+    this.bookSub?.unsubscribe();
   }
 
-  protected actionLabel(action: string): string {
+  protected actionLabel(action: string | null | undefined): string {
+    if (!action) return '—';
     switch (action) {
-      case 'BUY': return 'COMPRA';
-      case 'SELL': return 'VENTA';
-      case 'CLOSE': return 'CIERRE';
-      case 'UPDATE_SL': return 'MOV. SL';
-      case 'WAIT': return 'ESPERA';
+      case 'NADA': return 'NADA';
+      case 'ENTER_LONG': return 'ENTER LONG';
+      case 'ENTER_SHORT': return 'ENTER SHORT';
+      case 'activateTrailing': return 'TRAILING';
+      case 'moveStopTo': return 'MOVE STOP';
+      case 'moveStopToBreakeven': return 'BREAKEVEN';
+      case 'closeAll': return 'CLOSE ALL';
+      case 'closePartial': return 'CLOSE PART';
+      case 'moveTarget': return 'MOVE TP';
       default: return action;
     }
   }
 
-  protected actionClass(action: string): string {
-    switch (action) {
-      case 'BUY': return 'tag--buy';
-      case 'SELL': return 'tag--sell';
-      case 'CLOSE': return 'tag--close';
-      case 'UPDATE_SL': return 'tag--close';
-      case 'WAIT': return 'tag--wait';
-      default: return '';
+  protected formatTime(ts: string): string {
+    try {
+      return new Date(ts).toLocaleTimeString();
+    } catch {
+      return ts;
     }
   }
 
-  protected tradeActionLabel(action: string): string {
-    switch (action) {
-      case 'LONG': return 'LARGO';
-      case 'SHORT': return 'CORTO';
-      case 'HOLD': return 'ESPERA';
-      default: return action;
-    }
-  }
-
-  protected tradeActionClass(action: string): string {
-    switch (action) {
-      case 'LONG': return 'tag--buy';
-      case 'SHORT': return 'tag--sell';
-      case 'HOLD': return 'tag--wait';
-      default: return '';
-    }
-  }
-
-  protected convictionLabel(c: string): string {
-    switch (c) {
-      case 'NONE': return 'NINGUNA';
-      case 'LOW': return 'BAJA';
-      case 'MEDIUM': return 'MEDIA';
-      case 'HIGH': return 'ALTA';
-      default: return c;
-    }
-  }
-
-  protected healthLabel(h: string): string {
-    switch (h) {
-      case 'HEALTHY': return 'SANO';
-      case 'WARNING': return 'ADVERTENCIA';
-      case 'EXHAUSTED': return 'AGOTADO';
-      default: return h;
-    }
-  }
-
-  protected biasLabel(b: MarketBias | undefined): string {
-    switch (b) {
-      case 'STRONG_LONG': return 'FUERTE LARGO';
-      case 'LONG': return 'LARGO';
-      case 'NEUTRAL_LONG': return 'LIG. LARGO';
-      case 'NEUTRAL': return 'NEUTRO';
-      case 'NEUTRAL_SHORT': return 'LIG. CORTO';
-      case 'SHORT': return 'CORTO';
-      case 'STRONG_SHORT': return 'FUERTE CORTO';
-      default: return 'N/D';
-    }
-  }
-
-  protected biasClass(b: MarketBias | undefined): string {
-    switch (b) {
-      case 'STRONG_LONG':
-      case 'LONG': return 'tag--buy';
-      case 'NEUTRAL_LONG':
-      case 'NEUTRAL':
-      case 'NEUTRAL_SHORT': return 'tag--neutral';
-      case 'SHORT':
-      case 'STRONG_SHORT': return 'tag--sell';
-      default: return '';
-    }
-  }
-
-  protected directionLabel(d: MarketDirection | undefined): string {
-    switch (d) {
-      case 'BULLISH': return 'ALCISTA';
-      case 'BEARISH': return 'BAJISTA';
-      case 'NEUTRAL': return 'NEUTRO';
-      default: return 'N/D';
-    }
-  }
-
-  protected directionClass(d: MarketDirection | undefined): string {
-    switch (d) {
-      case 'BULLISH': return 'tag--buy';
-      case 'BEARISH': return 'tag--sell';
-      case 'NEUTRAL': return 'tag--neutral';
-      default: return '';
-    }
-  }
-
-  protected volatilityLabel(v: VolatilityState | undefined): string {
-    switch (v) {
-      case 'CONTRACTING': return 'CONTRACCIÓN';
-      case 'NORMAL': return 'NORMAL';
-      case 'EXPANDING': return 'EXPANSIÓN';
-      default: return 'N/D';
-    }
-  }
-
-  protected persistenceLabel(p: number | undefined): string {
-    if (p === undefined || !isFinite(p)) return 'N/D';
-    return `${(p * 100).toFixed(0)}%`;
-  }
-
-  protected formatTime(ts: number): string {
-    return new Date(ts).toLocaleTimeString('es-ES', { hour12: false });
-  }
-
-  protected setTab(tab: number): void {
-    this.activeTab.set(tab);
-  }
-
-  private startAnalysisListening(): void {
-    this.analysisSub?.unsubscribe();
-    this.analysisSub = this.analysisStream.analysis$.subscribe((a) => {
-      this.analysis.set(a);
-      this.lastUpdateTs = Date.now();
-      this.elapsedSeconds.set(0);
+  private startListening(): void {
+    this.specsSub?.unsubscribe();
+    this.bookSub?.unsubscribe();
+    this.specsSub = this.specsStream.specs$.subscribe((tick) => {
+      this.specs.set(tick.specs ?? []);
     });
-    this.startTimer();
+    this.bookSub = this.bookStream.events$.subscribe((event) => this.onBook(event));
   }
 
-  private startTimer(): void {
-    this.timerSub?.unsubscribe();
-    this.timerSub = interval(1000)
-      .pipe(
-        startWith(0),
-        map(() => this.lastUpdateTs > 0
-          ? Math.floor((Date.now() - this.lastUpdateTs) / 1000)
-          : 0)
-      )
-      .subscribe((sec) => this.elapsedSeconds.set(sec));
-  }
-
-  private startDecisionListening(): void {
-    this.decisionSub?.unsubscribe();
-    this.decisionSub = this.decisionStream.decisions$.subscribe((d) => {
-      this.decisions.update((prev) => [d, ...prev].slice(0, 100));
-    });
-  }
-
-  private startOrderListening(): void {
-    this.orderSub?.unsubscribe();
-    this.orderMap.clear();
-    this.ordersLoading.set(true);
-    this.orderSub = this.orderStream.execution$.subscribe((report) => {
-      this.handleExecutionReport(report);
-      this.ordersLoading.set(false);
-    });
-  }
-
-  private handleExecutionReport(report: ExecutionReport): void {
-    switch (report.type) {
-      case 'ORDER_ACCEPTED':
-      case 'ORDER_FILLED':
-        this.orderMap.set(report.orderId, {
-          id: report.orderId,
-          symbol: report.symbol,
-          side: report.side,
-          type: 'LIMIT',
-          quantity: report.filledQuantity,
-          price: report.price,
-          status: report.type,
-          timestamp: new Date(report.timestamp).toISOString(),
-        });
-        break;
-      case 'ORDER_CANCELLED':
-      case 'ORDER_EXPIRED':
-      case 'STOP_LOSS_HIT':
-      case 'TAKE_PROFIT_HIT':
-      case 'LIQUIDATED':
-      case 'POSITION_CLOSED': {
-        const existing = this.orderMap.get(report.orderId);
-        if (existing) {
-          this.orderMap.set(report.orderId, { ...existing, status: report.type });
-        }
-        break;
+  private onBook(event: BookEvent): void {
+    if (event.type === 'DECISION') {
+      this.decisions.update((list) => [event, ...list].slice(0, 80));
+      return;
+    }
+    if (event.type === 'OPEN') {
+      const row: OrderRow = {
+        id: `${event.strategyId}-${event.ts}`,
+        strategyId: event.strategyId,
+        side: event.side ?? '—',
+        status: 'OPEN',
+        price: event.entryPrice ?? 0,
+        size: event.size ?? 0,
+        stop: event.stopPrice,
+        target: event.targetPrice,
+      };
+      this.openByStrategy.set(event.strategyId, row);
+      this.activeOrders.set(Array.from(this.openByStrategy.values()));
+      return;
+    }
+    if (event.type === 'UPDATE_STOP') {
+      const current = this.openByStrategy.get(event.strategyId);
+      if (current) {
+        current.stop = event.stopPrice;
+        this.openByStrategy.set(event.strategyId, { ...current });
+        this.activeOrders.set(Array.from(this.openByStrategy.values()));
       }
+      return;
     }
-    this.orders.set(Array.from(this.orderMap.values()));
+    if (event.type === 'CLOSE') {
+      const closed: OrderRow = {
+        id: `${event.strategyId}-${event.ts}-close`,
+        strategyId: event.strategyId,
+        side: event.side ?? '—',
+        status: event.reason ?? 'CLOSE',
+        price: event.exitPrice ?? 0,
+        size: event.size ?? 0,
+        pnl: event.netPnl,
+      };
+      this.openByStrategy.delete(event.strategyId);
+      this.activeOrders.set(Array.from(this.openByStrategy.values()));
+      this.closedOrders.update((list) => [closed, ...list].slice(0, 80));
+    }
   }
 
   private clearAll(): void {
-    this.analysis.set(null);
+    this.specsSub?.unsubscribe();
+    this.bookSub?.unsubscribe();
+    this.specs.set([]);
     this.decisions.set([]);
-    this.orders.set([]);
-    this.ordersLoading.set(false);
-    this.elapsedSeconds.set(0);
-    this.lastUpdateTs = 0;
-    this.analysisSub?.unsubscribe();
-    this.analysisSub = null;
-    this.orderSub?.unsubscribe();
-    this.orderSub = null;
-    this.decisionSub?.unsubscribe();
-    this.decisionSub = null;
-    this.timerSub?.unsubscribe();
-    this.timerSub = null;
+    this.activeOrders.set([]);
+    this.closedOrders.set([]);
+    this.openByStrategy.clear();
   }
 }

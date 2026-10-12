@@ -323,3 +323,36 @@
 .analysis__section-title:first-child {
   margin-top: 0;
 }
+
+.spec__card {
+  border: 1px solid var(--border, #2a2e39);
+  border-radius: 6px;
+  padding: 0.5rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.78rem;
+}
+
+.spec__title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.spec__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  color: var(--text-muted, #8b93a7);
+}
+
+.spec__pos {
+  margin-top: 0.3rem;
+  color: #ffd54f;
+}
+
+.spec__decision {
+  margin-top: 0.25rem;
+  color: #9ea4b0;
+}

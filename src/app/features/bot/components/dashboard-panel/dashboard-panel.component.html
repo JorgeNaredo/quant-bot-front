@@ -1,173 +1,105 @@
 <div class="dashboard">
   <section class="dashboard__col">
     <div class="col__header">
-      <h3>Análisis</h3>
-      @if (analysis()) {
-        <span class="col__timer">Última actualización: {{ elapsedSeconds() }}s</span>
+      <h3>Specs</h3>
+    </div>
+    <div class="col__list">
+      @for (spec of specs(); track spec.id) {
+        <div class="spec__card">
+          <div class="spec__title">
+            <strong>{{ spec.id }}</strong>
+            <span class="tag">{{ spec.mode }}</span>
+            <span class="tag tag--status">{{ spec.machineState }}</span>
+          </div>
+          <div class="spec__meta">
+            <span>L stage {{ spec.stageIndexLong }} (wait {{ spec.barsInWaitLong }})</span>
+            <span>S stage {{ spec.stageIndexShort }} (wait {{ spec.barsInWaitShort }})</span>
+            <span>barsInState {{ spec.barsInState }}</span>
+          </div>
+          @if (spec.position; as pos) {
+            <div class="spec__pos">
+              {{ pos.side }} @ {{ pos.entryPrice | number:'1.2-2' }}
+              · SL {{ pos.stopPrice | number:'1.2-2' }}
+              · size {{ pos.size | number:'1.4-4' }}
+            </div>
+          }
+          <div class="spec__decision">Última: {{ actionLabel(spec.lastDecision) }}</div>
+        </div>
+      } @empty {
+        <p class="col__empty">Esperando specs…</p>
       }
     </div>
-    @if (analysis(); as a) {
-      <div class="analysis-grid">
-        <div class="accordion">
-          <button class="accordion__header" (click)="toggleSection('señal')">
-            <span>🎯 Señal y Decisión</span>
-            <span class="accordion__arrow">{{ isExpanded('señal') ? '▼' : '▶' }}</span>
-          </button>
-          @if (isExpanded('señal')) {
-            <div class="accordion__body">
-              <div class="analysis__row">
-                <span class="analysis__label">Símbolo</span>
-                <span class="analysis__value">{{ a.symbol }}</span>
-              </div>
-              <div class="analysis__row">
-                <span class="analysis__label">Acción</span>
-                <span class="analysis__value tag {{ tradeActionClass(a.action) }}">{{ tradeActionLabel(a.action) }}</span>
-              </div>
-              <div class="analysis__row">
-                <span class="analysis__label">Señal</span>
-                <span class="analysis__value">{{ a.signal }}</span>
-              </div>
-              <div class="analysis__row">
-                <span class="analysis__label">Convicción</span>
-                <span class="analysis__value">{{ convictionLabel(a.conviction) }}</span>
-              </div>
-              <div class="analysis__row">
-                <span class="analysis__label">Bias</span>
-                <span class="analysis__value tag {{ biasClass(a.bias) }}">{{ biasLabel(a.bias) }}</span>
-              </div>
-            </div>
-          }
-        </div>
-
-        <div class="accordion">
-          <button class="accordion__header" (click)="toggleSection('regimen')">
-            <span>📊 Régimen y Estructura</span>
-            <span class="accordion__arrow">{{ isExpanded('regimen') ? '▼' : '▶' }}</span>
-          </button>
-          @if (isExpanded('regimen')) {
-            <div class="accordion__body">
-              <div class="analysis__row">
-                <span class="analysis__label">Dirección</span>
-                <span class="analysis__value tag {{ directionClass(a.regime.direction) }}">{{ directionLabel(a.regime.direction) }}</span>
-              </div>
-              <div class="analysis__row">
-                <span class="analysis__label">Fuerza</span>
-                <span class="analysis__value">{{ a.regime.strength }}</span>
-              </div>
-              <div class="analysis__row">
-                <span class="analysis__label">Persistence</span>
-                <span class="analysis__value">{{ persistenceLabel(a.regime.persistence) }}</span>
-              </div>
-              <div class="analysis__row">
-                <span class="analysis__label">Volatilidad</span>
-                <span class="analysis__value">{{ volatilityLabel(a.regime.volatility) }}</span>
-              </div>
-              <div class="analysis__row">
-                <span class="analysis__label">Régimen</span>
-                <span class="analysis__value tag tag--regime">{{ healthLabel(a.regime.health) }}</span>
-              </div>
-              @if (a.invalidations.length) {
-                <div class="analysis__row analysis__row--invalidations">
-                  <span class="analysis__label">Invalidaciones</span>
-                  <span class="analysis__invalidations">
-                    @for (inv of a.invalidations; track $index) {
-                      <span class="chip chip--warning">{{ inv }}</span>
-                    }
-                  </span>
-                </div>
-              }
-            </div>
-          }
-        </div>
-      </div>
-    } @else {
-      <p class="col__empty">Esperando análisis...</p>
-    }
   </section>
 
   <section class="dashboard__col">
-    <h3>Decisiones</h3>
+    <h3>Acciones</h3>
     <div class="col__list">
       @for (dm of decisions(); track $index) {
         <div class="decision__entry">
-          <span class="tag {{ actionClass(dm.decision.action) }}">
-            {{ actionLabel(dm.decision.action) }}
-          </span>
-          <span class="decision__reason">{{ dm.decision.reason }}</span>
-          <span class="decision__time">{{ formatTime(dm.timestamp) }}</span>
+          <span class="tag">{{ actionLabel(dm.action) }}</span>
+          <span class="decision__reason">{{ dm.strategyId }}</span>
+          <span class="decision__time">{{ formatTime(dm.ts) }}</span>
         </div>
       } @empty {
-        <p class="col__empty">Sin decisiones aún</p>
+        <p class="col__empty">Sin acciones aún</p>
       }
     </div>
   </section>
 
   <section class="dashboard__col dashboard__col--orders">
     <h3>Órdenes</h3>
-    @if (ordersLoading()) {
-      <p class="col__empty">Cargando...</p>
-    } @else {
-      <div class="orders__subsection">
-        <h4 class="orders__subtitle">Activas</h4>
-        @if (activeOrders(); as actives) {
-          @if (actives.length === 0) {
-            <p class="col__empty">Sin órdenes activas</p>
-          } @else {
-            <div class="orders-table">
-              <div class="orders__header">
-                <span>Par</span>
-                <span>Lado</span>
-                <span>Cant</span>
-                <span>Precio</span>
-                <span>Estado</span>
-              </div>
-              @for (o of actives; track o.id) {
-                <div class="orders__row">
-                  <span>{{ o.symbol }}</span>
-                  <span class="tag {{ o.side === 'BUY' ? 'tag--buy' : 'tag--sell' }}">
-                    {{ o.side === 'BUY' ? 'COMPRA' : 'VENTA' }}
-                  </span>
-                  <span>{{ o.quantity }}</span>
-                  <span>{{ o.price | number:'1.5' }}</span>
-                  <span class="tag tag--status">{{ o.status }}</span>
-                </div>
-              }
+    <div class="orders__subsection">
+      <h4 class="orders__subtitle">Activas</h4>
+      @if (activeOrders().length === 0) {
+        <p class="col__empty">Sin posición abierta</p>
+      } @else {
+        <div class="orders-table">
+          <div class="orders__header">
+            <span>Strat</span>
+            <span>Lado</span>
+            <span>Entrada</span>
+            <span>SL</span>
+            <span>TP</span>
+          </div>
+          @for (o of activeOrders(); track o.id) {
+            <div class="orders__row">
+              <span>{{ o.strategyId }}</span>
+              <span class="tag">{{ o.side }}</span>
+              <span>{{ o.price | number:'1.2-2' }}</span>
+              <span>{{ o.stop | number:'1.2-2' }}</span>
+              <span>{{ o.target != null ? (o.target | number:'1.2-2') : '—' }}</span>
             </div>
           }
-        }
-      </div>
+        </div>
+      }
+    </div>
 
-      <hr class="orders__divider">
+    <hr class="orders__divider">
 
-      <div class="orders__subsection">
-        <h4 class="orders__subtitle">Cerradas</h4>
-        @if (closedOrders(); as closeds) {
-          @if (closeds.length === 0) {
-            <p class="col__empty">Sin órdenes cerradas</p>
-          } @else {
-            <div class="orders-table">
-              <div class="orders__header">
-                <span>Par</span>
-                <span>Lado</span>
-                <span>Cant</span>
-                <span>Precio</span>
-                <span>Estado</span>
-              </div>
-              @for (o of closeds; track o.id) {
-                <div class="orders__row">
-                  <span>{{ o.symbol }}</span>
-                  <span class="tag {{ o.side === 'BUY' ? 'tag--buy' : 'tag--sell' }}">
-                    {{ o.side === 'BUY' ? 'COMPRA' : 'VENTA' }}
-                  </span>
-                  <span>{{ o.quantity }}</span>
-                  <span>{{ o.price | number:'1.5' }}</span>
-                  <span class="tag tag--status">{{ o.status }}</span>
-                </div>
-              }
+    <div class="orders__subsection">
+      <h4 class="orders__subtitle">Cerradas</h4>
+      @if (closedOrders().length === 0) {
+        <p class="col__empty">Sin cierres</p>
+      } @else {
+        <div class="orders-table">
+          <div class="orders__header">
+            <span>Strat</span>
+            <span>Lado</span>
+            <span>Exit</span>
+            <span>PnL</span>
+            <span>Motivo</span>
+          </div>
+          @for (o of closedOrders(); track o.id) {
+            <div class="orders__row">
+              <span>{{ o.strategyId }}</span>
+              <span class="tag">{{ o.side }}</span>
+              <span>{{ o.price | number:'1.2-2' }}</span>
+              <span>{{ o.pnl | number:'1.2-2' }}</span>
+              <span class="tag tag--status">{{ o.status }}</span>
             </div>
           }
-        }
-      </div>
-    }
+        </div>
+      }
+    </div>
   </section>
 </div>
