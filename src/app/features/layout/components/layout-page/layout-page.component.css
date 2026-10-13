@@ -9,6 +9,17 @@
   display: flex;
   height: 100%;
   width: 100%;
+  box-sizing: border-box;
+}
+
+.layout--paper {
+  outline: 3px solid #f0a040;
+  outline-offset: -3px;
+}
+
+.layout--live {
+  outline: 3px solid #26a69a;
+  outline-offset: -3px;
 }
 
 .layout__sidebar {

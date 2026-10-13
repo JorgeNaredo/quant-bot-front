@@ -63,6 +63,19 @@ export class DashboardPanelComponent implements OnDestroy {
     this.bookSub?.unsubscribe();
   }
 
+  protected statusTagClass(machineState: string | null | undefined): string {
+    switch (machineState) {
+      case 'ARMED_LONG':
+        return 'tag tag--armed-long';
+      case 'ARMED_SHORT':
+        return 'tag tag--armed-short';
+      case 'ARMED_BOTH':
+        return 'tag tag--armed-both';
+      default:
+        return 'tag tag--status';
+    }
+  }
+
   protected actionLabel(action: string | null | undefined): string {
     if (!action) return '—';
     switch (action) {

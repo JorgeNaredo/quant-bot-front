@@ -16,6 +16,8 @@ import { AccountInfo } from '../../../../shared/models/account-info.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[class.collapsed]': 'collapsed()',
+    '[class.sidebar-host--paper]': 'profile === "paper"',
+    '[class.sidebar-host--live]': 'profile === "live"',
   },
 })
 export class SidebarComponent {
@@ -33,6 +35,10 @@ export class SidebarComponent {
   @Output() changeBackend = new EventEmitter<void>();
 
   protected readonly collapsed = signal(false);
+
+  protected get profileLabel(): string {
+    return (this.profile || '—').toUpperCase();
+  }
 
   protected onToggle(): void {
     this.collapsed.update((v) => !v);

@@ -6,7 +6,14 @@
   @if (!collapsed()) {
     <div class="sidebar__body">
       <section class="sidebar__actions">
-        <p class="sidebar__profile">{{ profile }} · {{ symbol }}</p>
+        <p class="sidebar__profile">
+          <span
+            class="sidebar__profile-badge"
+            [class.sidebar__profile-badge--paper]="profile === 'paper'"
+            [class.sidebar__profile-badge--live]="profile === 'live'"
+          >{{ profileLabel }}</span>
+          <span class="sidebar__profile-symbol">{{ symbol }}</span>
+        </p>
         <button
           type="button"
           class="btn btn--primary"

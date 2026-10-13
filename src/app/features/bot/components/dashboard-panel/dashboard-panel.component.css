@@ -269,6 +269,25 @@
   color: var(--text-muted);
 }
 
+.tag--armed-long {
+  background: rgba(38, 166, 154, 0.22);
+  color: #26a69a;
+}
+
+.tag--armed-short {
+  background: rgba(239, 83, 80, 0.22);
+  color: #ef5350;
+}
+
+.tag--armed-both {
+  background: linear-gradient(
+    90deg,
+    rgba(38, 166, 154, 0.22) 0%,
+    rgba(239, 83, 80, 0.22) 100%
+  );
+  color: #e0e0e0;
+}
+
 /* ── Accordion ── */
 
 .accordion {

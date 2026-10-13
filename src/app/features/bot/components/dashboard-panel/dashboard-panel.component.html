@@ -9,7 +9,7 @@
           <div class="spec__title">
             <strong>{{ spec.id }}</strong>
             <span class="tag">{{ spec.mode }}</span>
-            <span class="tag tag--status">{{ spec.machineState }}</span>
+            <span class="tag" [class]="statusTagClass(spec.machineState)">{{ spec.machineState }}</span>
           </div>
           <div class="spec__meta">
             <span>L stage {{ spec.stageIndexLong }} (wait {{ spec.barsInWaitLong }})</span>
