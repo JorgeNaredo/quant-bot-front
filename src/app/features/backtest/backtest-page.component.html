@@ -7,10 +7,26 @@
       }
     </div>
     <div class="bt__actions">
-      <button type="button" class="btn btn--primary" [disabled]="busy()" (click)="run()">
+      <label class="bt__select">
+        Informe
+        <select
+          [ngModel]="selectedReport()"
+          (ngModelChange)="onReportChange($event)"
+          [disabled]="busy() || reports().length === 0">
+          @if (reports().length === 0) {
+            <option value="">Sin informes</option>
+          }
+          @for (entry of reports(); track entry.name) {
+            <option [value]="entry.name">{{ entry.name }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" class="btn btn--primary" [disabled]="busy() || profiling()" (click)="run()">
         @if (busy()) { Evaluando… } @else { Lanzar evaluación }
       </button>
-      <button type="button" class="btn" [disabled]="busy()" (click)="loadLatest()">Cargar último informe</button>
+      <button type="button" class="btn" [disabled]="busy() || profiling()" (click)="profileCatalog()">
+        @if (profiling()) { Perfilando… } @else { Perfilar catálogo }
+      </button>
       <button type="button" class="btn btn--ghost" (click)="disconnect()">Cambiar backend</button>
     </div>
   </header>
@@ -19,49 +35,217 @@
     <p class="bt__error">{{ err }}</p>
   }
 
+  @if (profileOutcome(); as outcome) {
+    <section class="bt__section">
+      <h2>Perfil de catálogo · {{ outcome.symbol }}</h2>
+      @if (!outcome.ok) {
+        <p class="bt__error">{{ outcome.error || 'Falló el perfil' }}</p>
+      } @else if (outcome.summary; as summary) {
+        <div class="profile">
+          <p>ready {{ summary.ready }} · skipped {{ summary.skipped }} · ready% {{ summary.readyPct | number:'1.1-1' }}</p>
+          <p>features {{ summary.features }} · measured {{ summary.measured }} · max hole {{ summary.maxHoleBars }}</p>
+          <p class="bt__meta">{{ summary.dataDir }}</p>
+          @if (summary.degenerate.length) {
+            <p>Degenerados: {{ summary.degenerate.join(', ') }}</p>
+          } @else {
+            <p>Sin features degeneradas</p>
+          }
+        </div>
+      }
+    </section>
+  }
+
   @if (evaluation(); as doc) {
     <section class="bt__section">
-      <h2>Resultado</h2>
+      <h2>Train</h2>
+      <p class="bt__meta bt__run">{{ runMeta('train') }}</p>
       <div class="table">
-        <div class="table__head">
-          <span>Estrategia</span><span>Veredicto</span><span>Piso train</span><span>Piso OOS</span>
+        <div class="table__head table__head--summary">
+          <span>estrategia</span><span>piso</span><span>muestra</span><span>DSR</span><span>E[R]</span>
+          <span>PF</span><span>DD%</span><span>trades</span><span>equity</span><span>ret%</span>
         </div>
         @for (row of strategies('train'); track row.id) {
-          <div class="table__row">
+          <div class="table__row table__row--summary">
             <span>{{ row.id }}</span>
-            <span class="tag">{{ verdict(row.id) }}</span>
             <span>{{ grade(row, 'floor') }}</span>
-            <span>{{ oosFloor(row.id) }}</span>
+            <span>{{ row.sampleEnough ? 'sí' : 'no' }}</span>
+            <span>{{ graded(row, 'deflatedSharpe', row.deflatedSharpe, 2) }}</span>
+            <span>{{ graded(row, 'expectancyR', row.expectancyR, 3) }}</span>
+            <span>{{ graded(row, 'profitFactor', row.profitFactor, 2) }}</span>
+            <span>{{ graded(row, 'maxDrawdownPct', row.maxDrawdownPct, 1) }}</span>
+            <span>{{ graded(row, 'closedTrades', row.closedTrades, 0) }}</span>
+            <span>{{ num(row.finalEquity, 2) }}</span>
+            <span>{{ num(row.returnPct, 1) }}</span>
+          </div>
+        } @empty {
+          <p class="empty">Sin estrategias</p>
+        }
+      </div>
+
+      <h3 class="bt__sub">Trades</h3>
+      <div class="table">
+        <div class="table__head table__head--trades-agg">
+          <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
+          <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
+        </div>
+        @for (row of strategies('train'); track row.id) {
+          <div class="table__row table__row--trades-agg">
+            <span>{{ row.id }}</span>
+            <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
+            <span>{{ num(row.winRatePct, 1) }}</span>
+            <span>{{ num(row.winners, 0) }}</span>
+            <span>{{ num(row.avgWinR, 2) }}</span>
+            <span>{{ num(row.avgLossR, 2) }}</span>
+            <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
+            <span>{{ num(row.avgBarsInTrade, 1) }}</span>
+          </div>
+        }
+      </div>
+
+      <h3 class="bt__sub">Salidas</h3>
+      <div class="table">
+        <div class="table__head table__head--exits">
+          <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
+        </div>
+        @for (row of strategies('train'); track row.id) {
+          <div class="table__row table__row--exits">
+            <span>{{ row.id }}</span>
+            <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
+            <span>{{ exitCount(row, 'STOP') }}</span>
+            <span>{{ exitCount(row, 'TARGET') }}</span>
+            <span>{{ exitCount(row, 'SIGNAL') }}</span>
+          </div>
+        }
+      </div>
+
+      <h3 class="bt__sub">Curva</h3>
+      <div class="table">
+        <div class="table__head table__head--curve">
+          <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
+          <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
+        </div>
+        @for (row of strategies('train'); track row.id) {
+          <div class="table__row table__row--curve">
+            <span>{{ row.id }}</span>
+            <span>{{ num(row.maxDrawdownBars, 0) }}</span>
+            <span>{{ num(row.exposurePct, 1) }}</span>
+            <span>{{ num(row.sharpePerBar, 4) }}</span>
+            <span>{{ num(row.sharpeAnnualized, 2) }}</span>
+            <span>{{ num(row.probabilisticSharpe, 2) }}</span>
           </div>
         }
       </div>
     </section>
 
     <section class="bt__section">
-      <div class="bt__row">
-        <h2>Train / OOS</h2>
-        <div class="bt__tabs">
-          <button type="button" [class.active]="detailSplit() === 'train'" (click)="detailSplit.set('train')">Train</button>
-          <button type="button" [class.active]="detailSplit() === 'walkForward'" (click)="detailSplit.set('walkForward')">Walk-forward</button>
-        </div>
-      </div>
+      <h2>Walk-forward</h2>
+      <p class="bt__meta bt__run">{{ runMeta('walkForward') }}</p>
       <div class="table">
-        <div class="table__head table__head--metrics">
-          <span>Estrategia</span><span>Piso</span><span>DSR</span><span>E[R]</span><span>PF</span><span>DD%</span><span>Trades</span><span>Ret%</span>
+        <div class="table__head table__head--summary">
+          <span>estrategia</span><span>piso</span><span>muestra</span><span>DSR</span><span>E[R]</span>
+          <span>PF</span><span>DD%</span><span>trades</span><span>equity</span><span>ret%</span>
         </div>
-        @for (row of strategies(detailSplit()); track row.id) {
-          <div class="table__row table__row--metrics">
+        @for (row of strategies('walkForward'); track row.id) {
+          <div class="table__row table__row--summary">
             <span>{{ row.id }}</span>
             <span>{{ grade(row, 'floor') }}</span>
-            <span>{{ grade(row, 'deflatedSharpe') }} {{ row.deflatedSharpe | number:'1.2-2' }}</span>
-            <span>{{ grade(row, 'expectancyR') }} {{ row.expectancyR | number:'1.2-2' }}</span>
-            <span>{{ grade(row, 'profitFactor') }} {{ row.profitFactor | number:'1.2-2' }}</span>
-            <span>{{ grade(row, 'maxDrawdownPct') }} {{ row.maxDrawdownPct | number:'1.1-1' }}</span>
-            <span>{{ row.closedTrades ?? 0 }}</span>
-            <span>{{ row.returnPct | number:'1.1-1' }}</span>
+            <span>{{ row.sampleEnough ? 'sí' : 'no' }}</span>
+            <span>{{ graded(row, 'deflatedSharpe', row.deflatedSharpe, 2) }}</span>
+            <span>{{ graded(row, 'expectancyR', row.expectancyR, 3) }}</span>
+            <span>{{ graded(row, 'profitFactor', row.profitFactor, 2) }}</span>
+            <span>{{ graded(row, 'maxDrawdownPct', row.maxDrawdownPct, 1) }}</span>
+            <span>{{ graded(row, 'closedTrades', row.closedTrades, 0) }}</span>
+            <span>{{ num(row.finalEquity, 2) }}</span>
+            <span>{{ num(row.returnPct, 1) }}</span>
+          </div>
+        } @empty {
+          <p class="empty">Sin estrategias</p>
+        }
+      </div>
+
+      <h3 class="bt__sub">Trades</h3>
+      <div class="table">
+        <div class="table__head table__head--trades-agg">
+          <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
+          <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
+        </div>
+        @for (row of strategies('walkForward'); track row.id) {
+          <div class="table__row table__row--trades-agg">
+            <span>{{ row.id }}</span>
+            <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
+            <span>{{ num(row.winRatePct, 1) }}</span>
+            <span>{{ num(row.winners, 0) }}</span>
+            <span>{{ num(row.avgWinR, 2) }}</span>
+            <span>{{ num(row.avgLossR, 2) }}</span>
+            <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
+            <span>{{ num(row.avgBarsInTrade, 1) }}</span>
           </div>
         }
       </div>
+
+      <h3 class="bt__sub">Salidas</h3>
+      <div class="table">
+        <div class="table__head table__head--exits">
+          <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
+        </div>
+        @for (row of strategies('walkForward'); track row.id) {
+          <div class="table__row table__row--exits">
+            <span>{{ row.id }}</span>
+            <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
+            <span>{{ exitCount(row, 'STOP') }}</span>
+            <span>{{ exitCount(row, 'TARGET') }}</span>
+            <span>{{ exitCount(row, 'SIGNAL') }}</span>
+          </div>
+        }
+      </div>
+
+      <h3 class="bt__sub">Curva</h3>
+      <div class="table">
+        <div class="table__head table__head--curve">
+          <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
+          <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
+        </div>
+        @for (row of strategies('walkForward'); track row.id) {
+          <div class="table__row table__row--curve">
+            <span>{{ row.id }}</span>
+            <span>{{ num(row.maxDrawdownBars, 0) }}</span>
+            <span>{{ num(row.exposurePct, 1) }}</span>
+            <span>{{ num(row.sharpePerBar, 4) }}</span>
+            <span>{{ num(row.sharpeAnnualized, 2) }}</span>
+            <span>{{ num(row.probabilisticSharpe, 2) }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="bt__section">
+      <h2>Resultado</h2>
+      <div class="table">
+        <div class="table__head table__head--result">
+          <span>estrategia</span><span>train</span><span>oos</span><span>ΔDSR</span><span>ΔE[R]</span>
+          <span>Δtrades</span><span>Δret%</span><span>ΔDD%</span><span>verdict</span>
+        </div>
+        @for (row of comparisonRows(); track row.id) {
+          <div class="table__row table__row--result">
+            <span>{{ row.id }}</span>
+            <span>{{ row.trainFloor }}</span>
+            <span>{{ row.oosFloor }}</span>
+            <span>{{ num(row.delta?.deflatedSharpe, 2) }}</span>
+            <span>{{ num(row.delta?.expectancyR, 3) }}</span>
+            <span>{{ num(row.delta?.closedTrades, 0) }}</span>
+            <span>{{ num(row.delta?.returnPct, 1) }}</span>
+            <span>{{ num(row.delta?.maxDrawdownPct, 1) }}</span>
+            <span class="tag">{{ row.label }}</span>
+          </div>
+        } @empty {
+          <p class="empty">Sin comparación</p>
+        }
+      </div>
+      @for (row of comparisonRows(); track row.id) {
+        @if (row.reasons.length) {
+          <p class="bt__reason">{{ row.id }}: {{ row.reasons.join('; ') }}</p>
+        }
+      }
     </section>
 
     <section class="bt__section">
@@ -78,8 +262,14 @@
     </section>
 
     <section class="bt__section">
-      <h2>Stages ({{ detailSplit() }})</h2>
-      @for (row of strategies(detailSplit()); track row.id) {
+      <div class="bt__row">
+        <h2>Stages</h2>
+        <div class="bt__tabs">
+          <button type="button" [class.active]="tradeSplit() === 'train'" (click)="tradeSplit.set('train')">Train</button>
+          <button type="button" [class.active]="tradeSplit() === 'walkForward'" (click)="tradeSplit.set('walkForward')">Walk-forward</button>
+        </div>
+      </div>
+      @for (row of strategies(tradeSplit()); track row.id) {
         <details class="stages">
           <summary>{{ row.id }}</summary>
           <div class="stages__grid">
@@ -103,12 +293,12 @@
     </section>
 
     <section class="bt__section">
-      <h2>Trades ({{ detailSplit() }} · {{ selectedStrategy() }})</h2>
+      <h2>Trades individuales ({{ tradeSplit() }} · {{ selectedStrategy() }})</h2>
       <div class="table table--trades">
         <div class="table__head table__head--trades">
           <span>Strat</span><span>Side</span><span>Entry</span><span>Exit</span><span>PnL</span><span>R</span><span>Reason</span>
         </div>
-        @for (t of trades(detailSplit()); track $index) {
+        @for (t of trades(tradeSplit()); track $index) {
           <div class="table__row table__row--trades">
             <span>{{ t.strategyId }}</span>
             <span>{{ t.side }}</span>
@@ -124,6 +314,6 @@
       </div>
     </section>
   } @else {
-    <p class="bt__empty">Lanza la evaluación o carga el último informe.</p>
+    <p class="bt__empty">Elige un informe o lanza la evaluación.</p>
   }
 </div>

@@ -7,7 +7,7 @@
 }
 
 .bt {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 1.5rem;
   display: flex;
@@ -31,12 +31,32 @@
 .bt__meta {
   margin: 0.25rem 0 0;
   color: #8b93a7;
+  font-size: 0.85rem;
+}
+
+.bt__run {
+  margin: 0 0 0.75rem;
+  word-break: break-word;
 }
 
 .bt__actions {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.bt__select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #8b93a7;
+}
+
+.bt__select select {
+  min-width: 16rem;
+  max-width: 24rem;
 }
 
 .btn {
@@ -76,11 +96,18 @@
   border: 1px solid #222733;
   border-radius: 8px;
   padding: 1rem;
+  overflow-x: auto;
 }
 
 .bt__section h2 {
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
   font-size: 1.1rem;
+}
+
+.bt__sub {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.95rem;
+  color: #c5cad6;
 }
 
 .bt__row {
@@ -114,11 +141,11 @@
 .table__head,
 .table__row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
-  gap: 0.5rem;
-  padding: 0.4rem 0;
+  gap: 0.45rem;
+  padding: 0.35rem 0;
   border-bottom: 1px solid #222733;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  align-items: center;
 }
 
 .table__head {
@@ -126,14 +153,45 @@
   font-weight: 600;
 }
 
-.table__head--metrics,
-.table__row--metrics {
-  grid-template-columns: 2fr repeat(7, 1fr);
+.table__head--summary,
+.table__row--summary {
+  grid-template-columns: minmax(9rem, 2fr) repeat(9, minmax(3.5rem, 1fr));
+}
+
+.table__head--trades-agg,
+.table__row--trades-agg {
+  grid-template-columns: minmax(9rem, 2fr) repeat(7, minmax(3.5rem, 1fr));
+}
+
+.table__head--exits,
+.table__row--exits {
+  grid-template-columns: minmax(9rem, 2fr) repeat(4, minmax(4rem, 1fr));
+}
+
+.table__head--curve,
+.table__row--curve {
+  grid-template-columns: minmax(9rem, 2fr) repeat(5, minmax(4rem, 1fr));
+}
+
+.table__head--result,
+.table__row--result {
+  grid-template-columns: minmax(9rem, 2fr) repeat(8, minmax(3.5rem, 1fr));
 }
 
 .table__head--trades,
 .table__row--trades {
   grid-template-columns: 1.4fr 0.7fr 1.4fr 1.4fr 0.8fr 0.7fr 0.9fr;
+}
+
+.bt__reason {
+  margin: 0.35rem 0 0;
+  color: #8b93a7;
+  font-size: 0.8rem;
+}
+
+.profile p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
 }
 
 .tag {
@@ -190,14 +248,26 @@ select {
   padding: 0.35rem 0.5rem;
 }
 
-@media (max-width: 800px) {
-  .table__head--metrics,
-  .table__row--metrics,
+@media (max-width: 900px) {
+  .table__head--summary,
+  .table__row--summary,
+  .table__head--trades-agg,
+  .table__row--trades-agg,
+  .table__head--exits,
+  .table__row--exits,
+  .table__head--curve,
+  .table__row--curve,
+  .table__head--result,
+  .table__row--result,
   .table__head--trades,
   .table__row--trades {
     grid-template-columns: 1fr;
   }
   .stages__grid {
     grid-template-columns: 1fr;
+  }
+  .bt__select select {
+    min-width: 12rem;
+    max-width: 100%;
   }
 }

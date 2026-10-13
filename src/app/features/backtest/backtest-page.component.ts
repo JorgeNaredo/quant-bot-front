@@ -14,8 +14,12 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
 import {
+  ComparisonRow,
   EvaluationDocument,
+  ReportEntry,
+  SplitRun,
   StrategyReport,
+  SymbolOutcome,
   TradeRow,
 } from '../../shared/models/bot-api.model';
 import { BotApiService } from '../../shared/services/bot-api.service';
@@ -45,10 +49,14 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
 
   protected readonly session = this.store.connect;
   protected readonly evaluation = signal<EvaluationDocument | null>(null);
+  protected readonly reports = signal<ReportEntry[]>([]);
+  protected readonly selectedReport = signal<string>('');
   protected readonly busy = signal(false);
+  protected readonly profiling = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly profileOutcome = signal<SymbolOutcome | null>(null);
   protected readonly selectedStrategy = signal<string>('all');
-  protected readonly detailSplit = signal<'train' | 'walkForward'>('train');
+  protected readonly tradeSplit = signal<'train' | 'walkForward'>('train');
 
   protected readonly strategyIds = computed(() => {
     const doc = this.evaluation();
@@ -56,6 +64,33 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     for (const row of doc?.train?.strategies ?? []) ids.add(row.id);
     for (const row of doc?.walkForward?.strategies ?? []) ids.add(row.id);
     return ['all', ...Array.from(ids).sort()];
+  });
+
+  protected readonly comparisonRows = computed(() => {
+    const doc = this.evaluation();
+    if (!doc) return [] as Array<{
+      id: string;
+      trainFloor: string;
+      oosFloor: string;
+      delta: ComparisonRow['delta'];
+      label: string;
+      reasons: string[];
+    }>;
+    const comparisons = indexById(doc.comparison ?? []);
+    const verdicts = indexById(doc.verdicts ?? []);
+    const ids = orderedIds(doc);
+    return ids.map((id) => {
+      const cmp = comparisons.get(id);
+      const verdict = verdicts.get(id);
+      return {
+        id,
+        trainFloor: cmp?.trainFloor ?? '—',
+        oosFloor: cmp?.oosFloor ?? '—',
+        delta: cmp?.delta,
+        label: verdict?.label ?? '—',
+        reasons: verdict?.reasons ?? [],
+      };
+    });
   });
 
   protected readonly monthly = computed(() =>
@@ -69,7 +104,9 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     if (!this.session()) {
       this.router.navigateByUrl('/');
+      return;
     }
+    this.refreshReportList();
   }
 
   ngOnDestroy(): void {
@@ -93,6 +130,7 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
         }
         this.evaluation.set(response.evaluation);
         this.refreshChart();
+        this.refreshReportList(true);
       },
       error: (err) => {
         this.busy.set(false);
@@ -101,10 +139,12 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  protected loadLatest(): void {
+  protected onReportChange(name: string): void {
+    this.selectedReport.set(name);
+    if (!name) return;
     this.busy.set(true);
     this.error.set(null);
-    this.api.latestReport().subscribe({
+    this.api.getReport(name).subscribe({
       next: (doc) => {
         this.busy.set(false);
         this.evaluation.set(doc);
@@ -112,7 +152,28 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
       },
       error: (err) => {
         this.busy.set(false);
-        this.error.set(err?.message || 'No hay informe reciente');
+        this.error.set(err?.error?.message || err?.message || 'No se pudo cargar el informe');
+      },
+    });
+  }
+
+  protected profileCatalog(): void {
+    const symbol = this.session()?.symbol;
+    if (!symbol) {
+      this.error.set('Sin símbolo en la sesión');
+      return;
+    }
+    this.profiling.set(true);
+    this.error.set(null);
+    this.profileOutcome.set(null);
+    this.api.catalogProfile([symbol]).subscribe({
+      next: (report) => {
+        this.profiling.set(false);
+        this.profileOutcome.set(report.symbols[0] ?? null);
+      },
+      error: (err) => {
+        this.profiling.set(false);
+        this.error.set(err?.message || 'Error al perfilar el catálogo');
       },
     });
   }
@@ -126,17 +187,29 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     return this.evaluation()?.[split]?.strategies ?? [];
   }
 
-  protected verdict(id: string): string {
-    return this.evaluation()?.verdicts?.[id]?.label ?? '—';
+  protected runMeta(split: 'train' | 'walkForward'): string {
+    return formatRunHeader(split === 'train' ? 'train' : 'walk-forward', this.evaluation()?.[split]?.run);
   }
 
   protected grade(row: StrategyReport | undefined, key: string): string {
     return row?.grades?.[key] ?? '—';
   }
 
-  protected oosFloor(id: string): string {
-    const row = this.strategies('walkForward').find((s) => s.id === id);
-    return this.grade(row, 'floor');
+  protected graded(row: StrategyReport, key: string, value: number | undefined | null, digits: number): string {
+    const letter = this.grade(row, key);
+    if (value === undefined || value === null || Number.isNaN(value)) {
+      return letter === '—' ? '—' : `${letter} —`;
+    }
+    return `${letter} ${value.toFixed(digits)}`;
+  }
+
+  protected num(value: number | undefined | null, digits: number): string {
+    if (value === undefined || value === null || Number.isNaN(value)) return '—';
+    return value.toFixed(digits);
+  }
+
+  protected exitCount(row: StrategyReport, reason: string): number {
+    return row.exits?.[reason] ?? 0;
   }
 
   protected trades(split: 'train' | 'walkForward'): TradeRow[] {
@@ -149,6 +222,30 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
       }
     }
     return rows;
+  }
+
+  private refreshReportList(selectNewest = false): void {
+    this.api.listReports().subscribe({
+      next: (entries) => {
+        this.reports.set(entries);
+        if (!entries.length) {
+          return;
+        }
+        if (selectNewest || !this.selectedReport()) {
+          const name = entries[0].name;
+          this.selectedReport.set(name);
+          if (!this.evaluation() || selectNewest) {
+            // After a run, evaluation already comes from start; only fetch on first paint.
+            if (!selectNewest) {
+              this.onReportChange(name);
+            }
+          }
+        }
+      },
+      error: () => {
+        this.reports.set([]);
+      },
+    });
   }
 
   private refreshChart(): void {
@@ -212,4 +309,45 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
 
 function monthToUtc(month: string): string {
   return `${month}-01`;
+}
+
+function indexById<T extends { id: string }>(rows: T[]): Map<string, T> {
+  const map = new Map<string, T>();
+  for (const row of rows) {
+    if (row?.id) map.set(row.id, row);
+  }
+  return map;
+}
+
+function orderedIds(doc: EvaluationDocument): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const push = (id: string | undefined) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  };
+  for (const row of doc.train?.strategies ?? []) push(row.id);
+  for (const row of doc.walkForward?.strategies ?? []) push(row.id);
+  for (const row of doc.comparison ?? []) push(row.id);
+  for (const row of doc.verdicts ?? []) push(row.id);
+  return ids;
+}
+
+function formatRunHeader(name: string, run: SplitRun | undefined): string {
+  if (!run) return name;
+  let ended = run.endedBecause || '?';
+  if (run.error) ended = `${ended}: ${run.error}`;
+  const days = run.days == null ? '-' : `${run.days.toFixed(0)} d`;
+  return [
+    name,
+    run.profile || '',
+    `${run.symbol || ''} ${run.interval || ''}`.trim(),
+    `${run.firstBar || '-'} -> ${run.lastBar || '-'}`,
+    days,
+    `N=${run.trials ?? '?'}`,
+    ended,
+  ]
+    .filter((part) => part.length > 0)
+    .join('  ');
 }

@@ -5,6 +5,8 @@ import {
   ConnectResponse,
   EvaluationDocument,
   LifecycleResponse,
+  ProfileReport,
+  ReportEntry,
 } from '../models/bot-api.model';
 import { BackendConfigService } from './backend-config.service';
 
@@ -25,7 +27,24 @@ export class BotApiService {
     return this.http.post<LifecycleResponse>(`${this.config.url}/cc/stop`, {});
   }
 
+  listReports(): Observable<ReportEntry[]> {
+    return this.http.get<ReportEntry[]>(`${this.config.url}/cc/reports`);
+  }
+
   latestReport(): Observable<EvaluationDocument> {
     return this.http.get<EvaluationDocument>(`${this.config.url}/cc/reports/latest`);
+  }
+
+  getReport(name: string): Observable<EvaluationDocument> {
+    return this.http.get<EvaluationDocument>(
+      `${this.config.url}/cc/reports/${encodeURIComponent(name)}`,
+    );
+  }
+
+  catalogProfile(symbols: string[]): Observable<ProfileReport> {
+    return this.http.post<ProfileReport>(
+      `${this.config.url}/backtest/analysis/catalog-profile`,
+      { symbols },
+    );
   }
 }

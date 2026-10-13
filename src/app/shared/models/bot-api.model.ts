@@ -102,6 +102,11 @@ export interface BookEvent {
   reason: string | null;
 }
 
+export interface ReportEntry {
+  name: string;
+  modifiedAt: string;
+}
+
 export interface EvaluationDocument {
   evaluation?: {
     symbol?: string;
@@ -111,18 +116,51 @@ export interface EvaluationDocument {
   };
   train?: SplitDocument;
   walkForward?: SplitDocument;
-  comparison?: Record<string, unknown>;
-  verdicts?: Record<string, { label?: string; reasons?: string[] }>;
+  comparison?: ComparisonRow[];
+  verdicts?: VerdictRow[];
 }
 
 export interface SplitDocument {
-  run?: Record<string, unknown>;
+  run?: SplitRun;
   strategies?: StrategyReport[];
+}
+
+export interface SplitRun {
+  profile?: string;
+  symbol?: string;
+  interval?: string;
+  firstBar?: string;
+  lastBar?: string;
+  days?: number;
+  trials?: number;
+  endedBecause?: string;
+  error?: string;
+}
+
+export interface ComparisonRow {
+  id: string;
+  trainFloor?: string;
+  oosFloor?: string;
+  delta?: {
+    deflatedSharpe?: number;
+    expectancyR?: number;
+    closedTrades?: number;
+    returnPct?: number;
+    maxDrawdownPct?: number;
+  };
+}
+
+export interface VerdictRow {
+  id: string;
+  label?: string;
+  reasons?: string[];
 }
 
 export interface StrategyReport {
   id: string;
   grades?: Record<string, string>;
+  sampleEnough?: boolean;
+  openAtEnd?: boolean;
   deflatedSharpe?: number;
   expectancyR?: number;
   profitFactor?: number;
@@ -131,6 +169,18 @@ export interface StrategyReport {
   netPnl?: number;
   returnPct?: number;
   finalEquity?: number;
+  winRatePct?: number;
+  winners?: number;
+  avgWinR?: number;
+  avgLossR?: number;
+  maxConsecutiveLosses?: number;
+  avgBarsInTrade?: number;
+  exits?: Record<string, number>;
+  maxDrawdownBars?: number;
+  exposurePct?: number;
+  sharpePerBar?: number;
+  sharpeAnnualized?: number;
+  probabilisticSharpe?: number;
   stages?: {
     long?: StageRow[];
     short?: StageRow[];
@@ -158,4 +208,33 @@ export interface TradeRow {
   netPnl?: number;
   netR?: number;
   reason?: string;
+}
+
+export interface ProfileRequest {
+  symbols: string[];
+}
+
+export interface ProfileReport {
+  symbols: SymbolOutcome[];
+}
+
+export interface SymbolOutcome {
+  symbol: string;
+  ok: boolean;
+  error: string | null;
+  summary: SymbolSummary | null;
+}
+
+export interface SymbolSummary {
+  dataDir: string;
+  ready: number;
+  skipped: number;
+  readyPct: number;
+  maxHoleBars: number;
+  measured: number;
+  features: number;
+  degenerate: string[];
+  skipReasons: Record<string, number>;
+  markdown: string;
+  valuesCsv: string;
 }
