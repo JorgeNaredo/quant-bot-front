@@ -7,6 +7,7 @@ import {
   LifecycleResponse,
   ProfileReport,
   ReportEntry,
+  SpecReachabilityResponse,
 } from '../models/bot-api.model';
 import { BackendConfigService } from './backend-config.service';
 
@@ -44,6 +45,13 @@ export class BotApiService {
   catalogProfile(symbols: string[]): Observable<ProfileReport> {
     return this.http.post<ProfileReport>(
       `${this.config.url}/backtest/analysis/catalog-profile`,
+      { symbols },
+    );
+  }
+
+  specReachability(symbols: string[]): Observable<SpecReachabilityResponse> {
+    return this.http.post<SpecReachabilityResponse>(
+      `${this.config.url}/backtest/analysis/spec-reachability`,
       { symbols },
     );
   }

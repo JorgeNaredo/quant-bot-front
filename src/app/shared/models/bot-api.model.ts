@@ -238,3 +238,22 @@ export interface SymbolSummary {
   markdown: string;
   valuesCsv: string;
 }
+
+export interface SpecReachabilityResponse {
+  symbols: SpecReachabilityOutcome[];
+}
+
+export interface SpecReachabilityOutcome {
+  symbol: string;
+  ok: boolean;
+  error: string | null;
+  report: SpecReachabilityReport | null;
+}
+
+export interface SpecReachabilityReport {
+  symbol: string;
+  barCount: number;
+  firstBar: string;
+  lastBar: string;
+  unreachable: string[];
+}

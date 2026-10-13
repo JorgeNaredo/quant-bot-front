@@ -21,10 +21,13 @@
           }
         </select>
       </label>
-      <button type="button" class="btn btn--primary" [disabled]="busy() || profiling()" (click)="run()">
+      <button type="button" class="btn" [disabled]="busy() || profiling() || checkingReachability()" (click)="checkReachability()">
+        @if (checkingReachability()) { Validando… } @else { Validar specs }
+      </button>
+      <button type="button" class="btn btn--primary" [disabled]="busy() || profiling() || checkingReachability()" (click)="run()">
         @if (busy()) { Evaluando… } @else { Lanzar evaluación }
       </button>
-      <button type="button" class="btn" [disabled]="busy() || profiling()" (click)="profileCatalog()">
+      <button type="button" class="btn" [disabled]="busy() || profiling() || checkingReachability()" (click)="profileCatalog()">
         @if (profiling()) { Perfilando… } @else { Perfilar catálogo }
       </button>
       <button type="button" class="btn btn--ghost" (click)="disconnect()">Cambiar backend</button>
@@ -33,6 +36,41 @@
 
   @if (error(); as err) {
     <p class="bt__error">{{ err }}</p>
+  }
+
+  @if (reachabilityOutcome(); as reach) {
+    <section class="bt__section">
+      <details class="bt__details" open>
+        <summary>Alcanzabilidad de specs · {{ reach.symbol }}</summary>
+        @if (!reach.ok) {
+          <p class="bt__error">{{ reach.error || 'Falló la validación' }}</p>
+        } @else if (reach.report; as report) {
+          <p class="bt__meta bt__run">
+            {{ report.barCount }} barras · {{ report.firstBar }} → {{ report.lastBar }}
+          </p>
+          @if (report.unreachable.length === 0) {
+            <p class="bt__ok">Todas las specs son alcanzables en este dataset.</p>
+          } @else {
+            <p class="bt__warn">
+              {{ report.unreachable.length }} spec(s) semánticamente válidas pero no alcanzables
+              (alguna stage de entry nunca se cumple).
+            </p>
+            <div class="table">
+              <div class="table__head table__head--reach">
+                <span>#</span><span>spec</span><span>estado</span>
+              </div>
+              @for (id of report.unreachable; track id; let i = $index) {
+                <div class="table__row table__row--reach">
+                  <span>{{ i + 1 }}</span>
+                  <span>{{ id }}</span>
+                  <span class="tag tag--unreachable">unreachable</span>
+                </div>
+              }
+            </div>
+          }
+        }
+      </details>
+    </section>
   }
 
   @if (profileOutcome(); as outcome) {
@@ -56,6 +94,17 @@
   }
 
   @if (evaluation(); as doc) {
+    <div class="bt__row bt__filter">
+      <label class="bt__select">
+        Filtrar por estrategia
+        <select [ngModel]="selectedStrategy()" (ngModelChange)="onStrategyChange($event)">
+          @for (id of strategyIds(); track id) {
+            <option [value]="id">{{ id === 'all' ? 'todas' : id }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
     <section class="bt__section">
       <h2>Train</h2>
       <p class="bt__meta bt__run">{{ runMeta('train') }}</p>
@@ -64,7 +113,7 @@
           <span>estrategia</span><span>piso</span><span>muestra</span><span>DSR</span><span>E[R]</span>
           <span>PF</span><span>DD%</span><span>trades</span><span>equity</span><span>ret%</span>
         </div>
-        @for (row of strategies('train'); track row.id) {
+        @for (row of filteredStrategies('train'); track row.id) {
           <div class="table__row table__row--summary">
             <span>{{ row.id }}</span>
             <span>{{ grade(row, 'floor') }}</span>
@@ -82,59 +131,68 @@
         }
       </div>
 
-      <h3 class="bt__sub">Trades</h3>
-      <div class="table">
-        <div class="table__head table__head--trades-agg">
-          <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
-          <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
-        </div>
-        @for (row of strategies('train'); track row.id) {
-          <div class="table__row table__row--trades-agg">
-            <span>{{ row.id }}</span>
-            <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
-            <span>{{ num(row.winRatePct, 1) }}</span>
-            <span>{{ num(row.winners, 0) }}</span>
-            <span>{{ num(row.avgWinR, 2) }}</span>
-            <span>{{ num(row.avgLossR, 2) }}</span>
-            <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
-            <span>{{ num(row.avgBarsInTrade, 1) }}</span>
+      <details class="bt__details">
+        <summary>Detalle · Trades / Salidas / Curva</summary>
+        <h3 class="bt__sub">Trades</h3>
+        <div class="table">
+          <div class="table__head table__head--trades-agg">
+            <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
+            <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
           </div>
-        }
-      </div>
+          @for (row of filteredStrategies('train'); track row.id) {
+            <div class="table__row table__row--trades-agg">
+              <span>{{ row.id }}</span>
+              <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
+              <span>{{ num(row.winRatePct, 1) }}</span>
+              <span>{{ num(row.winners, 0) }}</span>
+              <span>{{ num(row.avgWinR, 2) }}</span>
+              <span>{{ num(row.avgLossR, 2) }}</span>
+              <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
+              <span>{{ num(row.avgBarsInTrade, 1) }}</span>
+            </div>
+          } @empty {
+            <p class="empty">Sin filas para el filtro</p>
+          }
+        </div>
 
-      <h3 class="bt__sub">Salidas</h3>
-      <div class="table">
-        <div class="table__head table__head--exits">
-          <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
-        </div>
-        @for (row of strategies('train'); track row.id) {
-          <div class="table__row table__row--exits">
-            <span>{{ row.id }}</span>
-            <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
-            <span>{{ exitCount(row, 'STOP') }}</span>
-            <span>{{ exitCount(row, 'TARGET') }}</span>
-            <span>{{ exitCount(row, 'SIGNAL') }}</span>
+        <h3 class="bt__sub">Salidas</h3>
+        <div class="table">
+          <div class="table__head table__head--exits">
+            <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
           </div>
-        }
-      </div>
+          @for (row of filteredStrategies('train'); track row.id) {
+            <div class="table__row table__row--exits">
+              <span>{{ row.id }}</span>
+              <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
+              <span>{{ exitCount(row, 'STOP') }}</span>
+              <span>{{ exitCount(row, 'TARGET') }}</span>
+              <span>{{ exitCount(row, 'SIGNAL') }}</span>
+            </div>
+          } @empty {
+            <p class="empty">Sin filas para el filtro</p>
+          }
+        </div>
 
-      <h3 class="bt__sub">Curva</h3>
-      <div class="table">
-        <div class="table__head table__head--curve">
-          <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
-          <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
-        </div>
-        @for (row of strategies('train'); track row.id) {
-          <div class="table__row table__row--curve">
-            <span>{{ row.id }}</span>
-            <span>{{ num(row.maxDrawdownBars, 0) }}</span>
-            <span>{{ num(row.exposurePct, 1) }}</span>
-            <span>{{ num(row.sharpePerBar, 4) }}</span>
-            <span>{{ num(row.sharpeAnnualized, 2) }}</span>
-            <span>{{ num(row.probabilisticSharpe, 2) }}</span>
+        <h3 class="bt__sub">Curva</h3>
+        <div class="table">
+          <div class="table__head table__head--curve">
+            <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
+            <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
           </div>
-        }
-      </div>
+          @for (row of filteredStrategies('train'); track row.id) {
+            <div class="table__row table__row--curve">
+              <span>{{ row.id }}</span>
+              <span>{{ num(row.maxDrawdownBars, 0) }}</span>
+              <span>{{ num(row.exposurePct, 1) }}</span>
+              <span>{{ num(row.sharpePerBar, 4) }}</span>
+              <span>{{ num(row.sharpeAnnualized, 2) }}</span>
+              <span>{{ num(row.probabilisticSharpe, 2) }}</span>
+            </div>
+          } @empty {
+            <p class="empty">Sin filas para el filtro</p>
+          }
+        </div>
+      </details>
     </section>
 
     <section class="bt__section">
@@ -145,7 +203,7 @@
           <span>estrategia</span><span>piso</span><span>muestra</span><span>DSR</span><span>E[R]</span>
           <span>PF</span><span>DD%</span><span>trades</span><span>equity</span><span>ret%</span>
         </div>
-        @for (row of strategies('walkForward'); track row.id) {
+        @for (row of filteredStrategies('walkForward'); track row.id) {
           <div class="table__row table__row--summary">
             <span>{{ row.id }}</span>
             <span>{{ grade(row, 'floor') }}</span>
@@ -163,59 +221,68 @@
         }
       </div>
 
-      <h3 class="bt__sub">Trades</h3>
-      <div class="table">
-        <div class="table__head table__head--trades-agg">
-          <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
-          <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
-        </div>
-        @for (row of strategies('walkForward'); track row.id) {
-          <div class="table__row table__row--trades-agg">
-            <span>{{ row.id }}</span>
-            <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
-            <span>{{ num(row.winRatePct, 1) }}</span>
-            <span>{{ num(row.winners, 0) }}</span>
-            <span>{{ num(row.avgWinR, 2) }}</span>
-            <span>{{ num(row.avgLossR, 2) }}</span>
-            <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
-            <span>{{ num(row.avgBarsInTrade, 1) }}</span>
+      <details class="bt__details">
+        <summary>Detalle · Trades / Salidas / Curva</summary>
+        <h3 class="bt__sub">Trades</h3>
+        <div class="table">
+          <div class="table__head table__head--trades-agg">
+            <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
+            <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
           </div>
-        }
-      </div>
+          @for (row of filteredStrategies('walkForward'); track row.id) {
+            <div class="table__row table__row--trades-agg">
+              <span>{{ row.id }}</span>
+              <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
+              <span>{{ num(row.winRatePct, 1) }}</span>
+              <span>{{ num(row.winners, 0) }}</span>
+              <span>{{ num(row.avgWinR, 2) }}</span>
+              <span>{{ num(row.avgLossR, 2) }}</span>
+              <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
+              <span>{{ num(row.avgBarsInTrade, 1) }}</span>
+            </div>
+          } @empty {
+            <p class="empty">Sin filas para el filtro</p>
+          }
+        </div>
 
-      <h3 class="bt__sub">Salidas</h3>
-      <div class="table">
-        <div class="table__head table__head--exits">
-          <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
-        </div>
-        @for (row of strategies('walkForward'); track row.id) {
-          <div class="table__row table__row--exits">
-            <span>{{ row.id }}</span>
-            <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
-            <span>{{ exitCount(row, 'STOP') }}</span>
-            <span>{{ exitCount(row, 'TARGET') }}</span>
-            <span>{{ exitCount(row, 'SIGNAL') }}</span>
+        <h3 class="bt__sub">Salidas</h3>
+        <div class="table">
+          <div class="table__head table__head--exits">
+            <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
           </div>
-        }
-      </div>
+          @for (row of filteredStrategies('walkForward'); track row.id) {
+            <div class="table__row table__row--exits">
+              <span>{{ row.id }}</span>
+              <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
+              <span>{{ exitCount(row, 'STOP') }}</span>
+              <span>{{ exitCount(row, 'TARGET') }}</span>
+              <span>{{ exitCount(row, 'SIGNAL') }}</span>
+            </div>
+          } @empty {
+            <p class="empty">Sin filas para el filtro</p>
+          }
+        </div>
 
-      <h3 class="bt__sub">Curva</h3>
-      <div class="table">
-        <div class="table__head table__head--curve">
-          <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
-          <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
-        </div>
-        @for (row of strategies('walkForward'); track row.id) {
-          <div class="table__row table__row--curve">
-            <span>{{ row.id }}</span>
-            <span>{{ num(row.maxDrawdownBars, 0) }}</span>
-            <span>{{ num(row.exposurePct, 1) }}</span>
-            <span>{{ num(row.sharpePerBar, 4) }}</span>
-            <span>{{ num(row.sharpeAnnualized, 2) }}</span>
-            <span>{{ num(row.probabilisticSharpe, 2) }}</span>
+        <h3 class="bt__sub">Curva</h3>
+        <div class="table">
+          <div class="table__head table__head--curve">
+            <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
+            <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
           </div>
-        }
-      </div>
+          @for (row of filteredStrategies('walkForward'); track row.id) {
+            <div class="table__row table__row--curve">
+              <span>{{ row.id }}</span>
+              <span>{{ num(row.maxDrawdownBars, 0) }}</span>
+              <span>{{ num(row.exposurePct, 1) }}</span>
+              <span>{{ num(row.sharpePerBar, 4) }}</span>
+              <span>{{ num(row.sharpeAnnualized, 2) }}</span>
+              <span>{{ num(row.probabilisticSharpe, 2) }}</span>
+            </div>
+          } @empty {
+            <p class="empty">Sin filas para el filtro</p>
+          }
+        </div>
+      </details>
     </section>
 
     <section class="bt__section">
@@ -241,9 +308,23 @@
           <p class="empty">Sin comparación</p>
         }
       </div>
-      @for (row of comparisonRows(); track row.id) {
-        @if (row.reasons.length) {
-          <p class="bt__reason">{{ row.id }}: {{ row.reasons.join('; ') }}</p>
+      @if (verdictReasons(); as reasons) {
+        @if (reasons.length) {
+          <div class="bt__reasons">
+            <h3 class="bt__reasons-title">Motivos del veredicto</h3>
+            <p class="bt__reasons-hint">
+              Explica por qué el label no es candidate (p. ej. muestra OOS insuficiente).
+            </p>
+            <ul class="bt__reasons-list">
+              @for (row of reasons; track row.id) {
+                <li class="bt__reasons-item">
+                  <span class="bt__reasons-id">{{ row.id }}</span>
+                  <span class="tag tag--verdict">{{ row.label }}</span>
+                  <span class="bt__reasons-text">{{ row.reasons.join('; ') }}</span>
+                </li>
+              }
+            </ul>
+          </div>
         }
       }
     </section>
@@ -251,11 +332,14 @@
     <section class="bt__section">
       <div class="bt__row">
         <h2>Ganancias por mes (IS / OOS)</h2>
-        <select [ngModel]="selectedStrategy()" (ngModelChange)="onStrategyChange($event)">
-          @for (id of strategyIds(); track id) {
-            <option [value]="id">{{ id }}</option>
-          }
-        </select>
+        <label class="bt__select">
+          Estrategia (gráfico)
+          <select [ngModel]="chartStrategy()" (ngModelChange)="onChartStrategyChange($event)">
+            @for (id of strategyIds(); track id) {
+              <option [value]="id">{{ id === 'all' ? 'todas' : id }}</option>
+            }
+          </select>
+        </label>
       </div>
       <div #monthChart class="bt__chart"></div>
       <p class="bt__legend"><span class="swatch swatch--is"></span> IS (train) <span class="swatch swatch--oos"></span> OOS</p>
@@ -269,7 +353,7 @@
           <button type="button" [class.active]="tradeSplit() === 'walkForward'" (click)="tradeSplit.set('walkForward')">Walk-forward</button>
         </div>
       </div>
-      @for (row of strategies(tradeSplit()); track row.id) {
+      @for (row of filteredStrategies(tradeSplit()); track row.id) {
         <details class="stages">
           <summary>{{ row.id }}</summary>
           <div class="stages__grid">
@@ -293,7 +377,17 @@
     </section>
 
     <section class="bt__section">
-      <h2>Trades individuales ({{ tradeSplit() }} · {{ selectedStrategy() }})</h2>
+      <div class="bt__row">
+        <h2>Trades individuales ({{ tradeSplit() }})</h2>
+        <label class="bt__select">
+          Estrategia (trades)
+          <select [ngModel]="tradesStrategy()" (ngModelChange)="onTradesStrategyChange($event)">
+            @for (id of strategyIds(); track id) {
+              <option [value]="id">{{ id === 'all' ? 'todas' : id }}</option>
+            }
+          </select>
+        </label>
+      </div>
       <div class="table table--trades">
         <div class="table__head table__head--trades">
           <span>Strat</span><span>Side</span><span>Entry</span><span>Exit</span><span>PnL</span><span>R</span><span>Reason</span>

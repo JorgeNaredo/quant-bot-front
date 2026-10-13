@@ -18,6 +18,7 @@ import {
   EvaluationDocument,
   ReportEntry,
   SplitRun,
+  SpecReachabilityOutcome,
   StrategyReport,
   SymbolOutcome,
   TradeRow,
@@ -53,9 +54,15 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   protected readonly selectedReport = signal<string>('');
   protected readonly busy = signal(false);
   protected readonly profiling = signal(false);
+  protected readonly checkingReachability = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly profileOutcome = signal<SymbolOutcome | null>(null);
+  protected readonly reachabilityOutcome = signal<SpecReachabilityOutcome | null>(null);
   protected readonly selectedStrategy = signal<string>('all');
+  /** Filtro del gráfico mensual: sigue al general, pero puede desviarse solo. */
+  protected readonly chartStrategy = signal<string>('all');
+  /** Filtro de trades individuales: mismo patrón que chartStrategy. */
+  protected readonly tradesStrategy = signal<string>('all');
   protected readonly tradeSplit = signal<'train' | 'walkForward'>('train');
 
   protected readonly strategyIds = computed(() => {
@@ -68,6 +75,7 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
 
   protected readonly comparisonRows = computed(() => {
     const doc = this.evaluation();
+    const filter = this.selectedStrategy();
     if (!doc) return [] as Array<{
       id: string;
       trainFloor: string;
@@ -78,7 +86,10 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     }>;
     const comparisons = indexById(doc.comparison ?? []);
     const verdicts = indexById(doc.verdicts ?? []);
-    const ids = orderedIds(doc);
+    let ids = orderedIds(doc);
+    if (filter !== 'all') {
+      ids = ids.filter((id) => id === filter);
+    }
     return ids.map((id) => {
       const cmp = comparisons.get(id);
       const verdict = verdicts.get(id);
@@ -94,7 +105,11 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   });
 
   protected readonly monthly = computed(() =>
-    this.buildMonthly(this.evaluation(), this.selectedStrategy()),
+    this.buildMonthly(this.evaluation(), this.chartStrategy()),
+  );
+
+  protected readonly verdictReasons = computed(() =>
+    this.comparisonRows().filter((row) => row.reasons.length > 0),
   );
 
   private chart: IChartApi | null = null;
@@ -178,13 +193,54 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  protected checkReachability(): void {
+    const symbol = this.session()?.symbol;
+    if (!symbol) {
+      this.error.set('Sin símbolo en la sesión');
+      return;
+    }
+    this.checkingReachability.set(true);
+    this.error.set(null);
+    this.api.specReachability([symbol]).subscribe({
+      next: (report) => {
+        this.checkingReachability.set(false);
+        this.reachabilityOutcome.set(report.symbols[0] ?? null);
+      },
+      error: (err) => {
+        this.checkingReachability.set(false);
+        this.error.set(err?.message || 'Error al validar alcanzabilidad');
+      },
+    });
+  }
+
   protected onStrategyChange(id: string): void {
     this.selectedStrategy.set(id);
+    this.chartStrategy.set(id);
+    this.tradesStrategy.set(id);
     this.refreshChart();
+  }
+
+  protected onChartStrategyChange(id: string): void {
+    this.chartStrategy.set(id);
+    this.refreshChart();
+  }
+
+  protected onTradesStrategyChange(id: string): void {
+    this.tradesStrategy.set(id);
   }
 
   protected strategies(split: 'train' | 'walkForward'): StrategyReport[] {
     return this.evaluation()?.[split]?.strategies ?? [];
+  }
+
+  /** Filas de un split respetando el filtro de estrategia. */
+  protected filteredStrategies(split: 'train' | 'walkForward'): StrategyReport[] {
+    const id = this.selectedStrategy();
+    const rows = this.strategies(split);
+    if (id === 'all') {
+      return rows;
+    }
+    return rows.filter((row) => row.id === id);
   }
 
   protected runMeta(split: 'train' | 'walkForward'): string {
@@ -213,10 +269,12 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   }
 
   protected trades(split: 'train' | 'walkForward'): TradeRow[] {
-    const id = this.selectedStrategy();
+    const filter = this.tradesStrategy();
     const rows: TradeRow[] = [];
     for (const strategy of this.strategies(split)) {
-      if (id !== 'all' && strategy.id !== id) continue;
+      if (filter !== 'all' && strategy.id !== filter) {
+        continue;
+      }
       for (const trade of strategy.trades ?? []) {
         rows.push({ ...trade, strategyId: trade.strategyId ?? strategy.id });
       }
