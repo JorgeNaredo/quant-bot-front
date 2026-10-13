@@ -5,4 +5,6 @@ export interface Candle {
   low: number;
   close: number;
   volume: number;
+  /** false = forming; true/undefined = closed bar from store */
+  closed?: boolean;
 }

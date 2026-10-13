@@ -23,6 +23,7 @@ export class CandleStreamService implements OnDestroy {
         low: Number(dto.low),
         close: Number(dto.close),
         volume: Number(dto.volume),
+        closed: dto.closed,
       })),
     );
   }

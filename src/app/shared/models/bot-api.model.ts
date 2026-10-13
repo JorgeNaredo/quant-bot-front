@@ -67,6 +67,8 @@ export interface CandleDto {
   low: number;
   close: number;
   volume: number;
+  /** false = vela 15m en formación (solo UI); true o ausente = cerrada del store */
+  closed?: boolean;
 }
 
 export interface SpecState {

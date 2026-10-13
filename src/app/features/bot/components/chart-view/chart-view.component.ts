@@ -284,7 +284,8 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
 private updateSeries(candle: Candle): void {
 	    if (!this.series) return;
 	    const time = this.toTime(candle.timestamp);
-	    if (this.latestCandleTime !== null && (time as number) <= (this.latestCandleTime as number)) {
+	    const timeNum = time as number;
+	    if (this.latestCandleTime !== null && timeNum < (this.latestCandleTime as number)) {
 	      return;
 	    }
 	    this.latestCandleTime = time;
