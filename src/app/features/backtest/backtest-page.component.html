@@ -21,6 +21,7 @@
           }
         </select>
       </label>
+      <button type="button" class="btn" [disabled]="!evaluation() || busy()" (click)="openExport()">Exportar</button>
       <button type="button" class="btn" [disabled]="busy() || profiling() || checkingReachability()" (click)="checkReachability()">
         @if (checkingReachability()) { Validando… } @else { Validar specs }
       </button>
@@ -409,5 +410,14 @@
     </section>
   } @else {
     <p class="bt__empty">Elige un informe o lanza la evaluación.</p>
+  }
+
+  @if (exportOpen()) {
+    @if (evaluation(); as doc) {
+      <app-report-export
+        [evaluation]="doc"
+        [reportName]="selectedReport() || 'latest'"
+        (closed)="exportOpen.set(false)" />
+    }
   }
 </div>

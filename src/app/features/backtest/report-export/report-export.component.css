@@ -1,0 +1,204 @@
+:host {
+  display: contents;
+}
+
+.export {
+  width: min(760px, calc(100vw - 2rem));
+  max-height: min(90vh, 44rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #d1d4dc;
+  box-sizing: border-box;
+}
+
+.export::backdrop {
+  background: rgba(5, 7, 11, 0.72);
+}
+
+.export__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: inherit;
+  overflow-y: auto;
+  padding: 1.25rem;
+  background: #151922;
+  border: 1px solid #2a2e39;
+  border-radius: 10px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  box-sizing: border-box;
+}
+
+.export__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.export__header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.export__header p {
+  margin: 0.25rem 0 0;
+  color: #8b93a7;
+  font-size: 0.8rem;
+  word-break: break-word;
+}
+
+.export__close {
+  border: 0;
+  background: transparent;
+  color: #8b93a7;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.export__close:hover {
+  color: #e7e9ee;
+}
+
+.export__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.export__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: #8b93a7;
+}
+
+.export__field select {
+  background: #10141c;
+  color: #e7e9ee;
+  border: 1px solid #2a2e39;
+  border-radius: 4px;
+  padding: 0.45rem 0.5rem;
+}
+
+.export__sections {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid #222733;
+  border-radius: 8px;
+}
+
+.export__sections legend {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 0.25rem;
+  color: #c5cad6;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.export__section-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.export__link {
+  border: 0;
+  background: transparent;
+  color: #3d7eff;
+  padding: 0;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.export__link:hover {
+  text-decoration: underline;
+}
+
+.export__checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 1rem;
+  margin-top: 0.35rem;
+}
+
+.export__check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: #d1d4dc;
+  cursor: pointer;
+}
+
+.export__check input {
+  accent-color: #3d7eff;
+}
+
+.export__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #222733;
+}
+
+.export__hint {
+  margin: 0;
+  max-width: 26rem;
+  color: #8b93a7;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.export__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn {
+  border: 1px solid #2a2e39;
+  background: #1a1f2b;
+  color: #e7e9ee;
+  border-radius: 6px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+}
+
+.btn--primary {
+  background: #3d7eff;
+  border-color: #3d7eff;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .export__grid,
+  .export__checks {
+    grid-template-columns: 1fr;
+  }
+
+  .export__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .export__hint {
+    max-width: none;
+  }
+
+  .export__actions {
+    justify-content: flex-end;
+  }
+}

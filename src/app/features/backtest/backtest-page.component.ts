@@ -14,10 +14,8 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
 import {
-  ComparisonRow,
   EvaluationDocument,
   ReportEntry,
-  SplitRun,
   SpecReachabilityOutcome,
   StrategyReport,
   SymbolOutcome,
@@ -25,17 +23,25 @@ import {
 } from '../../shared/models/bot-api.model';
 import { BotApiService } from '../../shared/services/bot-api.service';
 import { SessionStoreService } from '../../shared/services/session-store.service';
-
-interface MonthBar {
-  month: string;
-  is: number;
-  oos: number;
-}
+import {
+  MonthlyBar,
+  buildComparisonRows,
+  buildMonthlyBars,
+  collectTrades,
+  exitCountOf,
+  filterByStrategy,
+  formatNumber,
+  formatRunHeader,
+  gradeOf,
+  gradedOf,
+  strategyOptions,
+} from './report-data';
+import { ReportExportComponent } from './report-export/report-export.component';
 
 @Component({
   selector: 'app-backtest-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, ReportExportComponent],
   templateUrl: './backtest-page.component.html',
   styleUrl: './backtest-page.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -64,49 +70,23 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   /** Filtro de trades individuales: mismo patrón que chartStrategy. */
   protected readonly tradesStrategy = signal<string>('all');
   protected readonly tradeSplit = signal<'train' | 'walkForward'>('train');
+  protected readonly exportOpen = signal(false);
 
   protected readonly strategyIds = computed(() => {
     const doc = this.evaluation();
-    const ids = new Set<string>();
-    for (const row of doc?.train?.strategies ?? []) ids.add(row.id);
-    for (const row of doc?.walkForward?.strategies ?? []) ids.add(row.id);
-    return ['all', ...Array.from(ids).sort()];
+    return doc ? strategyOptions(doc) : ['all'];
   });
 
   protected readonly comparisonRows = computed(() => {
     const doc = this.evaluation();
-    const filter = this.selectedStrategy();
-    if (!doc) return [] as Array<{
-      id: string;
-      trainFloor: string;
-      oosFloor: string;
-      delta: ComparisonRow['delta'];
-      label: string;
-      reasons: string[];
-    }>;
-    const comparisons = indexById(doc.comparison ?? []);
-    const verdicts = indexById(doc.verdicts ?? []);
-    let ids = orderedIds(doc);
-    if (filter !== 'all') {
-      ids = ids.filter((id) => id === filter);
-    }
-    return ids.map((id) => {
-      const cmp = comparisons.get(id);
-      const verdict = verdicts.get(id);
-      return {
-        id,
-        trainFloor: cmp?.trainFloor ?? '—',
-        oosFloor: cmp?.oosFloor ?? '—',
-        delta: cmp?.delta,
-        label: verdict?.label ?? '—',
-        reasons: verdict?.reasons ?? [],
-      };
-    });
+    if (!doc) return [];
+    return buildComparisonRows(doc, this.selectedStrategy());
   });
 
-  protected readonly monthly = computed(() =>
-    this.buildMonthly(this.evaluation(), this.chartStrategy()),
-  );
+  protected readonly monthly = computed<MonthlyBar[]>(() => {
+    const doc = this.evaluation();
+    return doc ? buildMonthlyBars(doc, this.chartStrategy()) : [];
+  });
 
   protected readonly verdictReasons = computed(() =>
     this.comparisonRows().filter((row) => row.reasons.length > 0),
@@ -229,57 +209,53 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     this.tradesStrategy.set(id);
   }
 
+  protected openExport(): void {
+    if (this.evaluation()) {
+      this.exportOpen.set(true);
+    }
+  }
+
   protected strategies(split: 'train' | 'walkForward'): StrategyReport[] {
     return this.evaluation()?.[split]?.strategies ?? [];
   }
 
   /** Filas de un split respetando el filtro de estrategia. */
   protected filteredStrategies(split: 'train' | 'walkForward'): StrategyReport[] {
-    const id = this.selectedStrategy();
-    const rows = this.strategies(split);
-    if (id === 'all') {
-      return rows;
-    }
-    return rows.filter((row) => row.id === id);
+    return filterByStrategy(this.strategies(split), this.selectedStrategy());
   }
 
   protected runMeta(split: 'train' | 'walkForward'): string {
-    return formatRunHeader(split === 'train' ? 'train' : 'walk-forward', this.evaluation()?.[split]?.run);
+    return formatRunHeader(
+      split === 'train' ? 'train' : 'walk-forward',
+      this.evaluation()?.[split]?.run,
+    );
   }
 
   protected grade(row: StrategyReport | undefined, key: string): string {
-    return row?.grades?.[key] ?? '—';
+    return gradeOf(row, key);
   }
 
-  protected graded(row: StrategyReport, key: string, value: number | undefined | null, digits: number): string {
-    const letter = this.grade(row, key);
-    if (value === undefined || value === null || Number.isNaN(value)) {
-      return letter === '—' ? '—' : `${letter} —`;
-    }
-    return `${letter} ${value.toFixed(digits)}`;
+  protected graded(
+    row: StrategyReport,
+    key: string,
+    value: number | undefined | null,
+    digits: number,
+  ): string {
+    return gradedOf(row, key, value, digits);
   }
 
   protected num(value: number | undefined | null, digits: number): string {
-    if (value === undefined || value === null || Number.isNaN(value)) return '—';
-    return value.toFixed(digits);
+    return formatNumber(value, digits);
   }
 
   protected exitCount(row: StrategyReport, reason: string): number {
-    return row.exits?.[reason] ?? 0;
+    return exitCountOf(row, reason);
   }
 
   protected trades(split: 'train' | 'walkForward'): TradeRow[] {
-    const filter = this.tradesStrategy();
-    const rows: TradeRow[] = [];
-    for (const strategy of this.strategies(split)) {
-      if (filter !== 'all' && strategy.id !== filter) {
-        continue;
-      }
-      for (const trade of strategy.trades ?? []) {
-        rows.push({ ...trade, strategyId: trade.strategyId ?? strategy.id });
-      }
-    }
-    return rows;
+    const doc = this.evaluation();
+    if (!doc) return [];
+    return collectTrades(doc, split, this.tradesStrategy());
   }
 
   private refreshReportList(selectNewest = false): void {
@@ -343,69 +319,8 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
       this.chart.timeScale().fitContent();
     }, 0);
   }
-
-  private buildMonthly(doc: EvaluationDocument | null, strategyId: string): MonthBar[] {
-    if (!doc) return [];
-    const map = new Map<string, MonthBar>();
-    const add = (split: 'train' | 'walkForward', key: 'is' | 'oos') => {
-      for (const strategy of doc[split]?.strategies ?? []) {
-        if (strategyId !== 'all' && strategy.id !== strategyId) continue;
-        for (const trade of strategy.trades ?? []) {
-          if (!trade.exitTime) continue;
-          const month = trade.exitTime.slice(0, 7);
-          const row = map.get(month) ?? { month, is: 0, oos: 0 };
-          row[key] += trade.netPnl ?? 0;
-          map.set(month, row);
-        }
-      }
-    };
-    add('train', 'is');
-    add('walkForward', 'oos');
-    return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
-  }
 }
 
 function monthToUtc(month: string): string {
   return `${month}-01`;
-}
-
-function indexById<T extends { id: string }>(rows: T[]): Map<string, T> {
-  const map = new Map<string, T>();
-  for (const row of rows) {
-    if (row?.id) map.set(row.id, row);
-  }
-  return map;
-}
-
-function orderedIds(doc: EvaluationDocument): string[] {
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  const push = (id: string | undefined) => {
-    if (!id || seen.has(id)) return;
-    seen.add(id);
-    ids.push(id);
-  };
-  for (const row of doc.train?.strategies ?? []) push(row.id);
-  for (const row of doc.walkForward?.strategies ?? []) push(row.id);
-  for (const row of doc.comparison ?? []) push(row.id);
-  for (const row of doc.verdicts ?? []) push(row.id);
-  return ids;
-}
-
-function formatRunHeader(name: string, run: SplitRun | undefined): string {
-  if (!run) return name;
-  let ended = run.endedBecause || '?';
-  if (run.error) ended = `${ended}: ${run.error}`;
-  const days = run.days == null ? '-' : `${run.days.toFixed(0)} d`;
-  return [
-    name,
-    run.profile || '',
-    `${run.symbol || ''} ${run.interval || ''}`.trim(),
-    `${run.firstBar || '-'} -> ${run.lastBar || '-'}`,
-    days,
-    `N=${run.trials ?? '?'}`,
-    ended,
-  ]
-    .filter((part) => part.length > 0)
-    .join('  ');
 }

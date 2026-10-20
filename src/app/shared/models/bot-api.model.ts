@@ -113,8 +113,11 @@ export interface EvaluationDocument {
   evaluation?: {
     symbol?: string;
     trials?: number;
-    trainDataDir?: string;
-    walkForwardDataDir?: string;
+    dataDir?: string;
+    trainFrom?: string;
+    trainTo?: string;
+    walkForwardFrom?: string;
+    walkForwardTo?: string;
   };
   train?: SplitDocument;
   walkForward?: SplitDocument;

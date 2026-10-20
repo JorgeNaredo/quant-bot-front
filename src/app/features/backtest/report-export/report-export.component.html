@@ -1,0 +1,84 @@
+<dialog #dialog class="export" (click)="onBackdropClick($event)" (close)="onDialogClosed()">
+  <div class="export__panel">
+    <header class="export__header">
+      <div>
+        <h2>Exportar informe</h2>
+        <p>{{ reportName() }}</p>
+      </div>
+      <button type="button" class="export__close" aria-label="Cerrar" (click)="closeDialog()">×</button>
+    </header>
+
+    <div class="export__grid">
+      <label class="export__field">
+        <span>Formato</span>
+        <select [ngModel]="format()" (ngModelChange)="format.set($event)">
+          @for (option of formats; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="export__field">
+        <span>Estrategia</span>
+        <select [ngModel]="strategyId()" (ngModelChange)="strategyId.set($event)">
+          @for (id of strategies(); track id) {
+            <option [value]="id">{{ id === 'all' ? 'Todas' : id }}</option>
+          }
+        </select>
+      </label>
+    </div>
+
+    <fieldset class="export__sections">
+      <legend>
+        <span>Secciones</span>
+        <span class="export__section-actions">
+          <button type="button" class="export__link" (click)="selectAllSections()">Todas</button>
+          <button type="button" class="export__link" (click)="clearSections()">Ninguna</button>
+        </span>
+      </legend>
+      <div class="export__checks">
+        @for (section of sectionsCatalog; track section.key) {
+          <label class="export__check">
+            <input
+              type="checkbox"
+              [ngModel]="isChecked(section.key)"
+              (ngModelChange)="toggleSection(section.key, $event)" />
+            <span>{{ section.label }}</span>
+          </label>
+        }
+      </div>
+    </fieldset>
+
+    <div class="export__grid">
+      <label class="export__field">
+        <span>Split de trades</span>
+        <select [ngModel]="tradesSplit()" (ngModelChange)="tradesSplit.set($event)">
+          <option value="both">Train + walk-forward</option>
+          <option value="train">Train</option>
+          <option value="walkForward">Walk-forward</option>
+        </select>
+      </label>
+
+      <label class="export__field">
+        <span>Split de stages</span>
+        <select [ngModel]="stagesSplit()" (ngModelChange)="stagesSplit.set($event)">
+          <option value="both">Train + walk-forward</option>
+          <option value="train">Train</option>
+          <option value="walkForward">Walk-forward</option>
+        </select>
+      </label>
+    </div>
+
+    <footer class="export__footer">
+      <p class="export__hint">
+        Se generan tablas Markdown con las mismas columnas del front. Los trades van en un bloque CSV.
+      </p>
+      <div class="export__actions">
+        <button type="button" class="btn" (click)="closeDialog()">Cancelar</button>
+        <button type="button" class="btn btn--primary" [disabled]="!canDownload()" (click)="download()">
+          Descargar .md
+        </button>
+      </div>
+    </footer>
+  </div>
+</dialog>
