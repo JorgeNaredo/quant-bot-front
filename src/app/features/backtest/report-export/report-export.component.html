@@ -71,12 +71,16 @@
 
     <footer class="export__footer">
       <p class="export__hint">
-        Se generan tablas Markdown con las mismas columnas del front. Los trades van en un bloque CSV.
+        @if (format() === 'csv') {
+          Se generan bloques CSV por sección, separados por #. Ideal para análisis con IA.
+        } @else {
+          Se generan tablas Markdown con las mismas columnas del front. Los trades van en un bloque CSV.
+        }
       </p>
       <div class="export__actions">
         <button type="button" class="btn" (click)="closeDialog()">Cancelar</button>
         <button type="button" class="btn btn--primary" [disabled]="!canDownload()" (click)="download()">
-          Descargar .md
+          Descargar {{ format() === 'csv' ? '.csv' : '.md' }}
         </button>
       </div>
     </footer>

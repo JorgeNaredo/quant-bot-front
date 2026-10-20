@@ -1,9 +1,7 @@
 import { EvaluationDocument, StrategyReport } from '../../../shared/models/bot-api.model';
-import {
-  ALL_REPORT_SECTIONS,
-  buildExportFilename,
-  buildMarkdownReport,
-} from './report-markdown.builder';
+import { buildExportFilename } from './report-export.builder';
+import { ALL_REPORT_SECTIONS } from './report-export.types';
+import { buildMarkdownReport } from './report-markdown.builder';
 
 const alpha: StrategyReport = {
   id: 'alpha',

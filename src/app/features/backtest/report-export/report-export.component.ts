@@ -14,15 +14,18 @@ import { EvaluationDocument } from '../../../shared/models/bot-api.model';
 import { downloadTextFile } from '../../../shared/utils/download-file';
 import { strategyOptions } from '../report-data';
 import {
+  buildExportFilename,
+  buildReportExport,
+  exportMimeType,
+} from './report-export.builder';
+import {
   ALL_REPORT_SECTIONS,
   DEFAULT_REPORT_SECTIONS,
   ExportFormat,
   REPORT_SECTIONS,
   ReportSection,
   SplitScope,
-  buildExportFilename,
-  buildMarkdownReport,
-} from './report-markdown.builder';
+} from './report-export.types';
 
 @Component({
   selector: 'app-report-export',
@@ -42,6 +45,7 @@ export class ReportExportComponent implements AfterViewInit {
 
   protected readonly formats: ReadonlyArray<{ value: ExportFormat; label: string }> = [
     { value: 'md', label: 'Markdown (.md)' },
+    { value: 'csv', label: 'CSV para análisis IA (.csv)' },
   ];
   protected readonly sectionsCatalog = REPORT_SECTIONS;
   protected readonly format = signal<ExportFormat>('md');
@@ -76,7 +80,7 @@ export class ReportExportComponent implements AfterViewInit {
 
   protected download(): void {
     if (!this.canDownload()) return;
-    const content = buildMarkdownReport(this.evaluation(), this.reportName(), {
+    const content = buildReportExport(this.evaluation(), this.reportName(), {
       format: this.format(),
       sections: this.sections(),
       strategyId: this.strategyId(),
@@ -88,7 +92,7 @@ export class ReportExportComponent implements AfterViewInit {
       this.strategyId(),
       this.format(),
     );
-    downloadTextFile(filename, content, 'text/markdown;charset=utf-8');
+    downloadTextFile(filename, content, exportMimeType(this.format()));
     this.closeDialog();
   }
 
