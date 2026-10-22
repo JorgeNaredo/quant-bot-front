@@ -7,6 +7,7 @@ import {
   buildComparisonRows,
   buildMonthlyBars,
   collectTrades,
+  evaluationModeOf,
   exitCountOf,
   filterByStrategy,
   formatNumber,
@@ -45,21 +46,38 @@ export function buildMetaTable(
   selectedLabels: string,
 ): ReportTable {
   const meta = doc.evaluation ?? {};
-  const run = doc.train?.run;
-  const wf = doc.walkForward?.run;
-  const symbol = meta.symbol || run?.symbol || wf?.symbol || '—';
+  const confirm = evaluationModeOf(doc) === 'confirm';
+  const trainRun = doc.train?.run;
+  const wfRun = doc.walkForward?.run;
+  const holdoutRun = doc.holdout?.run;
+  const symbol =
+    meta.symbol || trainRun?.symbol || wfRun?.symbol || holdoutRun?.symbol || '—';
   const rows: string[][] = [
     ['reporte', reportName],
+    ['mode', meta.mode || 'develop'],
     ['simbolo', symbol],
     ['estrategia exportada', strategyId === 'all' ? 'todas' : strategyId],
     ['trials', meta.trials == null ? '—' : String(meta.trials)],
     ['dataDir', meta.dataDir || '—'],
-    ['train', range(meta.trainFrom, meta.trainTo)],
-    ['walk-forward', range(meta.walkForwardFrom, meta.walkForwardTo)],
-    ['secciones', selectedLabels || '—'],
   ];
-  if (run) rows.push(['run train', formatRunHeader('train', run)]);
-  if (wf) rows.push(['run walk-forward', formatRunHeader('walk-forward', wf)]);
+  if (confirm) {
+    rows.push(
+      ['oos', range(meta.oosFrom, meta.oosTo)],
+      ['holdout', range(meta.holdoutFrom, meta.holdoutTo)],
+    );
+    if (holdoutRun) rows.push(['run holdout', formatRunHeader('holdout', holdoutRun)]);
+  } else {
+    rows.push(
+      ['train', range(meta.trainFrom ?? meta.isFrom, meta.trainTo ?? meta.isTo)],
+      [
+        'walk-forward',
+        range(meta.walkForwardFrom ?? meta.oosFrom, meta.walkForwardTo ?? meta.oosTo),
+      ],
+    );
+    if (trainRun) rows.push(['run train', formatRunHeader('train', trainRun)]);
+    if (wfRun) rows.push(['run walk-forward', formatRunHeader('walk-forward', wfRun)]);
+  }
+  rows.push(['secciones', selectedLabels || '—']);
 
   return {
     headers: ['campo', 'valor'],
@@ -159,11 +177,12 @@ export function buildResultTable(
   strategyId: string,
 ): ReportTable {
   const rows = buildComparisonRows(doc, strategyId);
+  const confirm = evaluationModeOf(doc) === 'confirm';
   return {
     headers: [
       'estrategia',
-      'train',
-      'oos',
+      confirm ? 'oos' : 'train',
+      confirm ? 'holdout' : 'oos',
       'ΔDSR',
       'ΔE[R]',
       'Δtrades',
@@ -173,8 +192,8 @@ export function buildResultTable(
     ],
     rows: rows.map((row) => [
       row.id,
-      row.trainFloor,
-      row.oosFloor,
+      row.leftFloor,
+      row.rightFloor,
       formatNumber(row.delta?.deflatedSharpe, 2),
       formatNumber(row.delta?.expectancyR, 3),
       formatNumber(row.delta?.closedTrades, 0),
@@ -202,13 +221,14 @@ export function buildMonthlyTable(
   doc: EvaluationDocument,
   strategyId: string,
 ): ReportTable {
+  const confirm = evaluationModeOf(doc) === 'confirm';
   return {
-    headers: ['mes', 'IS', 'OOS'],
-    rows: buildMonthlyBars(doc, strategyId).map((bar) => [
-      bar.month,
-      formatNumber(bar.is, 2),
-      formatNumber(bar.oos, 2),
-    ]),
+    headers: confirm ? ['mes', 'holdout'] : ['mes', 'IS', 'OOS'],
+    rows: buildMonthlyBars(doc, strategyId).map((bar) =>
+      confirm
+        ? [bar.month, formatNumber(bar.oos, 2)]
+        : [bar.month, formatNumber(bar.is, 2), formatNumber(bar.oos, 2)],
+    ),
   };
 }
 

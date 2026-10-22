@@ -12,19 +12,18 @@ import {
 import { FormsModule } from '@angular/forms';
 import { EvaluationDocument } from '../../../shared/models/bot-api.model';
 import { downloadTextFile } from '../../../shared/utils/download-file';
-import { strategyOptions } from '../report-data';
+import { evaluationModeOf, strategyOptions } from '../report-data';
 import {
   buildExportFilename,
   buildReportExport,
   exportMimeType,
 } from './report-export.builder';
 import {
-  ALL_REPORT_SECTIONS,
-  DEFAULT_REPORT_SECTIONS,
   ExportFormat,
-  REPORT_SECTIONS,
   ReportSection,
   SplitScope,
+  defaultSectionsForDocument,
+  sectionsForDocument,
 } from './report-export.types';
 
 @Component({
@@ -47,16 +46,25 @@ export class ReportExportComponent implements AfterViewInit {
     { value: 'md', label: 'Markdown (.md)' },
     { value: 'csv', label: 'CSV para análisis IA (.csv)' },
   ];
-  protected readonly sectionsCatalog = REPORT_SECTIONS;
   protected readonly format = signal<ExportFormat>('md');
-  protected readonly sections = signal<ReportSection[]>([...DEFAULT_REPORT_SECTIONS]);
+  protected readonly sections = signal<ReportSection[]>([]);
   protected readonly strategyId = signal<string>('all');
   protected readonly tradesSplit = signal<SplitScope>('both');
   protected readonly stagesSplit = signal<SplitScope>('both');
   protected readonly strategies = computed(() => strategyOptions(this.evaluation()));
   protected readonly canDownload = computed(() => this.sections().length > 0);
+  protected readonly confirmMode = computed(
+    () => evaluationModeOf(this.evaluation()) === 'confirm',
+  );
+  protected readonly sectionsCatalog = computed(() => sectionsForDocument(this.evaluation()));
 
   ngAfterViewInit(): void {
+    const doc = this.evaluation();
+    this.sections.set(defaultSectionsForDocument(doc));
+    if (evaluationModeOf(doc) === 'confirm') {
+      this.tradesSplit.set('holdout');
+      this.stagesSplit.set('holdout');
+    }
     this.dialogRef?.nativeElement.showModal();
   }
 
@@ -71,7 +79,7 @@ export class ReportExportComponent implements AfterViewInit {
   }
 
   protected selectAllSections(): void {
-    this.sections.set([...ALL_REPORT_SECTIONS]);
+    this.sections.set(this.sectionsCatalog().map((section) => section.key));
   }
 
   protected clearSections(): void {

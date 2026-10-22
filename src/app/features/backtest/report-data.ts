@@ -6,7 +6,7 @@ import {
   TradeRow,
 } from '../../shared/models/bot-api.model';
 
-export type SplitKey = 'train' | 'walkForward';
+export type SplitKey = 'train' | 'walkForward' | 'holdout';
 
 export interface MonthlyBar {
   month: string;
@@ -16,11 +16,16 @@ export interface MonthlyBar {
 
 export interface ComparisonViewRow {
   id: string;
-  trainFloor: string;
-  oosFloor: string;
+  leftFloor: string;
+  rightFloor: string;
   delta: ComparisonRow['delta'];
   label: string;
   reasons: string[];
+}
+
+export function evaluationModeOf(doc: EvaluationDocument | null | undefined): 'develop' | 'confirm' {
+  const mode = (doc?.evaluation?.mode || 'develop').toString().toLowerCase();
+  return mode === 'confirm' ? 'confirm' : 'develop';
 }
 
 export function formatNumber(value: number | undefined | null, digits: number): string {
@@ -83,8 +88,12 @@ export function orderedStrategyIds(doc: EvaluationDocument): string[] {
     seen.add(id);
     ids.push(id);
   };
-  for (const row of doc.train?.strategies ?? []) push(row.id);
-  for (const row of doc.walkForward?.strategies ?? []) push(row.id);
+  if (evaluationModeOf(doc) === 'confirm') {
+    for (const row of doc.holdout?.strategies ?? []) push(row.id);
+  } else {
+    for (const row of doc.train?.strategies ?? []) push(row.id);
+    for (const row of doc.walkForward?.strategies ?? []) push(row.id);
+  }
   for (const row of doc.comparison ?? []) push(row.id);
   for (const row of doc.verdicts ?? []) push(row.id);
   return ids;
@@ -113,13 +122,14 @@ export function buildComparisonRows(
   if (strategyId !== 'all') {
     ids = ids.filter((id) => id === strategyId);
   }
+  const confirm = evaluationModeOf(doc) === 'confirm';
   return ids.map((id) => {
     const cmp = comparisons.get(id);
     const verdict = verdicts.get(id);
     return {
       id,
-      trainFloor: cmp?.trainFloor ?? '—',
-      oosFloor: cmp?.oosFloor ?? '—',
+      leftFloor: confirm ? (cmp?.oosFloor ?? '—') : (cmp?.trainFloor ?? '—'),
+      rightFloor: confirm ? (cmp?.holdoutFloor ?? '—') : (cmp?.oosFloor ?? '—'),
       delta: cmp?.delta,
       label: verdict?.label ?? '—',
       reasons: verdict?.reasons ?? [],
@@ -161,7 +171,11 @@ export function buildMonthlyBars(
       }
     }
   };
-  add('train', 'is');
-  add('walkForward', 'oos');
+  if (evaluationModeOf(doc) === 'confirm') {
+    add('holdout', 'oos');
+  } else {
+    add('train', 'is');
+    add('walkForward', 'oos');
+  }
   return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
 }

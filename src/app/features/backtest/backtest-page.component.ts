@@ -25,9 +25,11 @@ import { BotApiService } from '../../shared/services/bot-api.service';
 import { SessionStoreService } from '../../shared/services/session-store.service';
 import {
   MonthlyBar,
+  SplitKey,
   buildComparisonRows,
   buildMonthlyBars,
   collectTrades,
+  evaluationModeOf,
   exitCountOf,
   filterByStrategy,
   formatNumber,
@@ -69,8 +71,9 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   protected readonly chartStrategy = signal<string>('all');
   /** Filtro de trades individuales: mismo patrón que chartStrategy. */
   protected readonly tradesStrategy = signal<string>('all');
-  protected readonly tradeSplit = signal<'train' | 'walkForward'>('train');
+  protected readonly tradeSplit = signal<SplitKey>('train');
   protected readonly exportOpen = signal(false);
+  protected readonly confirmMode = computed(() => evaluationModeOf(this.evaluation()) === 'confirm');
 
   protected readonly strategyIds = computed(() => {
     const doc = this.evaluation();
@@ -114,9 +117,22 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   }
 
   protected run(): void {
+    this.launch('develop');
+  }
+
+  protected confirmHoldout(): void {
+    const ok = window.confirm(
+      'Confirmación holdout: corre oos→holdout una vez con las specs actuales. '
+        + 'No uses el resultado para retocar umbrales. ¿Continuar?',
+    );
+    if (!ok) return;
+    this.launch('confirm');
+  }
+
+  private launch(mode: 'develop' | 'confirm'): void {
     this.busy.set(true);
     this.error.set(null);
-    this.api.start().subscribe({
+    this.api.start(mode).subscribe({
       next: (response) => {
         this.busy.set(false);
         if (!response.ok) {
@@ -124,6 +140,7 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
           return;
         }
         this.evaluation.set(response.evaluation);
+        this.tradeSplit.set(mode === 'confirm' ? 'holdout' : 'train');
         this.refreshChart();
         this.refreshReportList(true);
       },
@@ -143,6 +160,7 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
       next: (doc) => {
         this.busy.set(false);
         this.evaluation.set(doc);
+        this.tradeSplit.set(evaluationModeOf(doc) === 'confirm' ? 'holdout' : 'train');
         this.refreshChart();
       },
       error: (err) => {
@@ -215,20 +233,19 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  protected strategies(split: 'train' | 'walkForward'): StrategyReport[] {
+  protected strategies(split: SplitKey): StrategyReport[] {
     return this.evaluation()?.[split]?.strategies ?? [];
   }
 
   /** Filas de un split respetando el filtro de estrategia. */
-  protected filteredStrategies(split: 'train' | 'walkForward'): StrategyReport[] {
+  protected filteredStrategies(split: SplitKey): StrategyReport[] {
     return filterByStrategy(this.strategies(split), this.selectedStrategy());
   }
 
-  protected runMeta(split: 'train' | 'walkForward'): string {
-    return formatRunHeader(
-      split === 'train' ? 'train' : 'walk-forward',
-      this.evaluation()?.[split]?.run,
-    );
+  protected runMeta(split: SplitKey): string {
+    const label =
+      split === 'train' ? 'train' : split === 'walkForward' ? 'walk-forward' : 'holdout';
+    return formatRunHeader(label, this.evaluation()?.[split]?.run);
   }
 
   protected grade(row: StrategyReport | undefined, key: string): string {
@@ -252,7 +269,7 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     return exitCountOf(row, reason);
   }
 
-  protected trades(split: 'train' | 'walkForward'): TradeRow[] {
+  protected trades(split: SplitKey): TradeRow[] {
     const doc = this.evaluation();
     if (!doc) return [];
     return collectTrades(doc, split, this.tradesStrategy());

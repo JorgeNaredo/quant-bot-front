@@ -1,4 +1,5 @@
 import { EvaluationDocument } from '../../../shared/models/bot-api.model';
+import { SplitKey } from '../report-data';
 import {
   REPORT_SECTIONS,
   ReportExportOptions,
@@ -59,6 +60,14 @@ export function buildCsvReport(
   if (selected.has('walkForwardDetails')) {
     addDetailBlocks(blocks, 'walk_forward', doc, strategyId, 'walkForward');
   }
+  if (selected.has('holdoutSummary')) {
+    blocks.push(
+      serializeCsvBlock('holdout_summary', buildSummaryTable(doc, 'holdout', strategyId)),
+    );
+  }
+  if (selected.has('holdoutDetails')) {
+    addDetailBlocks(blocks, 'holdout', doc, strategyId, 'holdout');
+  }
   if (selected.has('result')) {
     blocks.push(
       serializeCsvBlock('result', buildResultTable(doc, strategyId)),
@@ -101,7 +110,7 @@ function addDetailBlocks(
   keyPrefix: string,
   doc: EvaluationDocument,
   strategyId: string,
-  split: 'train' | 'walkForward' = 'train',
+  split: SplitKey = 'train',
 ): void {
   const tables = buildDetailTables(doc, split, strategyId);
   blocks.push(
@@ -119,7 +128,8 @@ function addStageBlocks(
 ): void {
   for (const split of splitKeys(scope)) {
     const groups = buildStageGroups(doc, split, strategyId);
-    const key = split === 'train' ? 'train' : 'walk_forward';
+    const key =
+      split === 'train' ? 'train' : split === 'holdout' ? 'holdout' : 'walk_forward';
     const stageTable: ReportTable = {
       headers: ['estrategia', 'side', ...STAGE_HEADERS],
       rows: groups.flatMap((group) => [
@@ -148,16 +158,18 @@ function addTradeBlocks(
   scope: SplitScope,
 ): void {
   for (const split of splitKeys(scope)) {
-    const key = split === 'train' ? 'train' : 'walk_forward';
+    const key =
+      split === 'train' ? 'train' : split === 'holdout' ? 'holdout' : 'walk_forward';
     blocks.push(
       serializeCsvBlock(`trades_${key}`, buildTradeTable(doc, split, strategyId)),
     );
   }
 }
 
-function splitKeys(scope: SplitScope): Array<'train' | 'walkForward'> {
+function splitKeys(scope: SplitScope): SplitKey[] {
   if (scope === 'train') return ['train'];
   if (scope === 'walkForward') return ['walkForward'];
+  if (scope === 'holdout') return ['holdout'];
   return ['train', 'walkForward'];
 }
 

@@ -37,7 +37,7 @@
         </span>
       </legend>
       <div class="export__checks">
-        @for (section of sectionsCatalog; track section.key) {
+        @for (section of sectionsCatalog(); track section.key) {
           <label class="export__check">
             <input
               type="checkbox"
@@ -53,18 +53,26 @@
       <label class="export__field">
         <span>Split de trades</span>
         <select [ngModel]="tradesSplit()" (ngModelChange)="tradesSplit.set($event)">
-          <option value="both">Train + walk-forward</option>
-          <option value="train">Train</option>
-          <option value="walkForward">Walk-forward</option>
+          @if (confirmMode()) {
+            <option value="holdout">Holdout</option>
+          } @else {
+            <option value="both">Train + walk-forward</option>
+            <option value="train">Train</option>
+            <option value="walkForward">Walk-forward</option>
+          }
         </select>
       </label>
 
       <label class="export__field">
         <span>Split de stages</span>
         <select [ngModel]="stagesSplit()" (ngModelChange)="stagesSplit.set($event)">
-          <option value="both">Train + walk-forward</option>
-          <option value="train">Train</option>
-          <option value="walkForward">Walk-forward</option>
+          @if (confirmMode()) {
+            <option value="holdout">Holdout</option>
+          } @else {
+            <option value="both">Train + walk-forward</option>
+            <option value="train">Train</option>
+            <option value="walkForward">Walk-forward</option>
+          }
         </select>
       </label>
     </div>

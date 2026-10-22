@@ -1,5 +1,5 @@
 import { EvaluationDocument } from '../../../shared/models/bot-api.model';
-import { formatRunHeader } from '../report-data';
+import { SplitKey, evaluationModeOf, formatRunHeader } from '../report-data';
 import {
   REPORT_SECTIONS,
   ReportExportOptions,
@@ -48,6 +48,8 @@ export function buildMarkdownReport(
   add('trainDetails', renderDetails(doc, 'train', strategyId));
   add('walkForwardSummary', renderSummary(doc, 'walkForward', strategyId));
   add('walkForwardDetails', renderDetails(doc, 'walkForward', strategyId));
+  add('holdoutSummary', renderSummary(doc, 'holdout', strategyId));
+  add('holdoutDetails', renderDetails(doc, 'holdout', strategyId));
   add('result', renderResult(doc, strategyId));
   add('monthly', renderMonthly(doc, strategyId));
   add('stages', renderStages(doc, strategyId, options.stagesSplit));
@@ -70,7 +72,7 @@ function renderMeta(
 
 function renderSummary(
   doc: EvaluationDocument,
-  split: 'train' | 'walkForward',
+  split: SplitKey,
   strategyId: string,
 ): string {
   return [
@@ -82,7 +84,7 @@ function renderSummary(
 
 function renderDetails(
   doc: EvaluationDocument,
-  split: 'train' | 'walkForward',
+  split: SplitKey,
   strategyId: string,
 ): string {
   const tables = buildDetailTables(doc, split, strategyId);
@@ -115,10 +117,11 @@ function renderResult(doc: EvaluationDocument, strategyId: string): string {
 }
 
 function renderMonthly(doc: EvaluationDocument, strategyId: string): string {
-  return [
-    '## Ganancias por mes (IS / OOS)',
-    markdownTable(buildMonthlyTable(doc, strategyId)),
-  ].join('\n\n');
+  const title =
+    evaluationModeOf(doc) === 'confirm'
+      ? '## Ganancias por mes (holdout)'
+      : '## Ganancias por mes (IS / OOS)';
+  return [title, markdownTable(buildMonthlyTable(doc, strategyId))].join('\n\n');
 }
 
 function renderStages(
@@ -192,16 +195,21 @@ function mdInline(value: string): string {
   return String(value ?? '').replace(/\r?\n/g, ' ').trim();
 }
 
-function splitKeys(scope: SplitScope): Array<'train' | 'walkForward'> {
+function splitKeys(scope: SplitScope): SplitKey[] {
   if (scope === 'train') return ['train'];
   if (scope === 'walkForward') return ['walkForward'];
+  if (scope === 'holdout') return ['holdout'];
   return ['train', 'walkForward'];
 }
 
-function splitLabel(split: 'train' | 'walkForward'): string {
-  return split === 'train' ? 'Train' : 'Walk-forward';
+function splitLabel(split: SplitKey): string {
+  if (split === 'train') return 'Train';
+  if (split === 'holdout') return 'Holdout';
+  return 'Walk-forward';
 }
 
-function runLabel(split: 'train' | 'walkForward'): string {
-  return split === 'train' ? 'train' : 'walk-forward';
+function runLabel(split: SplitKey): string {
+  if (split === 'train') return 'train';
+  if (split === 'holdout') return 'holdout';
+  return 'walk-forward';
 }

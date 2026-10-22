@@ -109,11 +109,21 @@ export interface ReportEntry {
   modifiedAt: string;
 }
 
+export type EvaluationMode = 'develop' | 'confirm';
+
 export interface EvaluationDocument {
   evaluation?: {
     symbol?: string;
+    mode?: EvaluationMode | string;
+    plan?: string[];
     trials?: number;
     dataDir?: string;
+    isFrom?: string;
+    isTo?: string;
+    oosFrom?: string;
+    oosTo?: string;
+    holdoutFrom?: string;
+    holdoutTo?: string;
     trainFrom?: string;
     trainTo?: string;
     walkForwardFrom?: string;
@@ -121,6 +131,9 @@ export interface EvaluationDocument {
   };
   train?: SplitDocument;
   walkForward?: SplitDocument;
+  /** Presente en mode=confirm (auditoría; la UI de confirmación no lo detalla). */
+  oos?: SplitDocument;
+  holdout?: SplitDocument;
   comparison?: ComparisonRow[];
   verdicts?: VerdictRow[];
 }
@@ -146,6 +159,7 @@ export interface ComparisonRow {
   id: string;
   trainFloor?: string;
   oosFloor?: string;
+  holdoutFloor?: string;
   delta?: {
     deflatedSharpe?: number;
     expectancyR?: number;

@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import {
   ConnectResponse,
   EvaluationDocument,
+  EvaluationMode,
   LifecycleResponse,
   ProfileReport,
   ReportEntry,
@@ -20,8 +21,8 @@ export class BotApiService {
     return this.http.get<ConnectResponse>(`${this.config.url}/cc/connect`);
   }
 
-  start(): Observable<LifecycleResponse> {
-    return this.http.post<LifecycleResponse>(`${this.config.url}/cc/start`, {});
+  start(mode: EvaluationMode = 'develop'): Observable<LifecycleResponse> {
+    return this.http.post<LifecycleResponse>(`${this.config.url}/cc/start`, { mode });
   }
 
   stop(): Observable<LifecycleResponse> {
