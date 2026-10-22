@@ -1,33 +1,49 @@
 <div class="connect">
   <div class="connect__card">
-    <h1 class="connect__title">Algotrade</h1>
-    <p class="connect__lead">Introduce la dirección del backend del bot.</p>
+    <div class="connect__brand">
+      <span class="connect__logo" aria-hidden="true"><i class="pi pi-chart-line"></i></span>
+      <div>
+        <h1 class="connect__title">Algotrade</h1>
+        <p class="connect__tag">Trading desk</p>
+      </div>
+    </div>
 
-    <label class="connect__label" for="backendUrl">URL o host:puerto</label>
-    <input
-      id="backendUrl"
-      class="connect__input"
-      type="text"
-      [(ngModel)]="url"
-      placeholder="http://localhost:8080"
-      (keyup.enter)="connect()"
-    />
+    <p class="connect__lead">
+      Conecta con el backend del bot para cargar la sesión y el perfil activo.
+    </p>
+
+    <div class="connect__field">
+      <label class="connect__label" for="backendUrl">URL o host:puerto</label>
+      <input
+        pInputText
+        id="backendUrl"
+        class="connect__input"
+        type="text"
+        [(ngModel)]="url"
+        placeholder="http://localhost:8080"
+        autocomplete="off"
+        spellcheck="false"
+        [attr.aria-invalid]="error() ? 'true' : null"
+        aria-describedby="backend-url-hint"
+        (keyup.enter)="connect()" />
+      <p id="backend-url-hint" class="connect__hint">
+        Ej. http://localhost:8080 o 192.168.1.20:8080
+      </p>
+    </div>
 
     @if (error(); as err) {
-      <p class="connect__error">{{ err }}</p>
+      <p-message severity="error" [text]="err" styleClass="connect__message" />
     }
 
-    <button
-      type="button"
-      class="connect__btn"
+    <p-button
+      label="Conectar"
+      [loading]="busy()"
       [disabled]="busy()"
-      (click)="connect()"
-    >
-      @if (busy()) {
-        Conectando…
-      } @else {
-        Conectar
-      }
-    </button>
+      styleClass="connect__submit"
+      (onClick)="connect()" />
+
+    <p class="connect__foot">
+      El perfil detectado decide si entras al desk en vivo o al backtest.
+    </p>
   </div>
 </div>

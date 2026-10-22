@@ -8,13 +8,13 @@
 }
 
 :host.sidebar-host--paper {
-  box-shadow: inset 4px 0 0 0 #f0a040;
-  border-right-color: color-mix(in srgb, #f0a040 45%, var(--border));
+  box-shadow: inset 4px 0 0 0 var(--warning);
+  border-right-color: color-mix(in srgb, var(--warning) 45%, var(--border));
 }
 
 :host.sidebar-host--live {
-  box-shadow: inset 4px 0 0 0 #26a69a;
-  border-right-color: color-mix(in srgb, #26a69a 45%, var(--border));
+  box-shadow: inset 4px 0 0 0 var(--success);
+  border-right-color: color-mix(in srgb, var(--success) 45%, var(--border));
 }
 
 :host.collapsed {
@@ -63,7 +63,13 @@
   min-height: 0;
 }
 
-/* ── Actions ── */
+.sidebar__account,
+.sidebar__profit {
+  background: var(--surface-elevated);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+}
 
 .sidebar__actions {
   display: flex;
@@ -75,6 +81,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-2);
   padding: 0.6rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -92,14 +99,14 @@
 }
 
 .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #0e1116;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
 }
 
 .btn--primary:hover {
-  background: #2bbbab;
-  border-color: #2bbbab;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .btn--secondary {
@@ -134,15 +141,15 @@
 }
 
 .sidebar__profile-badge--paper {
-  color: #ffb74d;
-  background: rgba(240, 160, 64, 0.18);
-  border: 1px solid rgba(240, 160, 64, 0.55);
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.5);
 }
 
 .sidebar__profile-badge--live {
-  color: #26a69a;
-  background: rgba(38, 166, 154, 0.18);
-  border: 1px solid rgba(38, 166, 154, 0.55);
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.16);
+  border: 1px solid rgba(34, 197, 94, 0.5);
 }
 
 .sidebar__profile-symbol {
@@ -153,21 +160,53 @@
 }
 
 .sidebar__state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
+}
+
+.sidebar__state-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sidebar__state-sep {
+  color: var(--surface-border-strong);
+}
+
+.sidebar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-color-muted);
+  flex-shrink: 0;
+}
+
+.sidebar__dot--on {
+  background: var(--success);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 22%, transparent);
+}
+
+.sidebar__dot--operating {
+  background: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 .sidebar__error {
   margin: 0;
   font-size: 0.75rem;
-  color: #ef5350;
+  color: var(--danger);
 }
 
 /* ── Account ── */
 
-.sidebar__account h3,
-.sidebar__broker h3 {
+.sidebar__account h2,
+.sidebar__broker h2 {
   margin: 0 0 0.5rem 0;
   font-size: 0.75rem;
   font-weight: 600;
@@ -190,16 +229,17 @@
 .account__value {
   color: var(--text);
   text-align: right;
+  font-family: var(--font-mono);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .pnl--positive {
-  color: #26a69a;
+  color: var(--success);
 }
 
 .pnl--negative {
-  color: #ef5350;
+  color: var(--danger);
 }
 
 .account__empty {
@@ -210,7 +250,7 @@
 
 /* ── Profit Locked ── */
 
-.sidebar__profit h3 {
+.sidebar__profit h2 {
   margin: 0 0 0.5rem 0;
   font-size: 0.75rem;
   font-weight: 600;
@@ -220,22 +260,23 @@
 }
 
 .profit__value {
-  font-size: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
   font-weight: 700;
   text-align: center;
   padding: 0.4rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-variant-numeric: tabular-nums;
 }
 
 .profit--positive {
-  color: #26a69a;
-  background: color-mix(in srgb, #26a69a 10%, transparent);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
 }
 
 .profit--negative {
-  color: #ef5350;
-  background: color-mix(in srgb, #ef5350 10%, transparent);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .profit__empty {
@@ -248,7 +289,7 @@
 
 /* ── Stats ── */
 
-.sidebar__stats h3 {
+.sidebar__stats h2 {
   margin: 0 0 0.5rem 0;
   font-size: 0.75rem;
   font-weight: 600;
@@ -275,11 +316,11 @@
 }
 
 .stats__value--win {
-  color: #26a69a;
+  color: var(--success);
 }
 
 .stats__value--loss {
-  color: #ef5350;
+  color: var(--danger);
 }
 
 .stats__empty {

@@ -1,15 +1,17 @@
 import {
-  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
-  ViewChild,
+  OnInit,
   computed,
   input,
   output,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
+import { DialogModule } from 'primeng/dialog';
+import { SelectModule } from 'primeng/select';
 import { EvaluationDocument } from '../../../shared/models/bot-api.model';
 import { downloadTextFile } from '../../../shared/utils/download-file';
 import { evaluationModeOf, strategyOptions } from '../report-data';
@@ -29,20 +31,18 @@ import {
 @Component({
   selector: 'app-report-export',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ButtonModule, CheckboxModule, DialogModule, SelectModule],
   templateUrl: './report-export.component.html',
   styleUrl: './report-export.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ReportExportComponent implements AfterViewInit {
-  @ViewChild('dialog')
-  private dialogRef?: ElementRef<HTMLDialogElement>;
-
+export class ReportExportComponent implements OnInit {
   readonly evaluation = input.required<EvaluationDocument>();
   readonly reportName = input.required<string>();
   readonly closed = output<void>();
 
-  protected readonly formats: ReadonlyArray<{ value: ExportFormat; label: string }> = [
+  protected readonly visible = signal(true);
+  protected readonly formats: { value: ExportFormat; label: string }[] = [
     { value: 'md', label: 'Markdown (.md)' },
     { value: 'csv', label: 'CSV para análisis IA (.csv)' },
   ];
@@ -58,14 +58,25 @@ export class ReportExportComponent implements AfterViewInit {
   );
   protected readonly sectionsCatalog = computed(() => sectionsForDocument(this.evaluation()));
 
-  ngAfterViewInit(): void {
+  protected readonly splitOptions: { value: SplitScope; label: string }[] = [
+    { value: 'both', label: 'Train + walk-forward' },
+    { value: 'train', label: 'Train' },
+    { value: 'walkForward', label: 'Walk-forward' },
+  ];
+  protected readonly confirmSplitOptions: { value: SplitScope; label: string }[] = [
+    { value: 'holdout', label: 'Holdout' },
+  ];
+  protected readonly strategyChoices = computed(() =>
+    this.strategies().map((id) => ({ value: id, label: id === 'all' ? 'Todas' : id })),
+  );
+
+  ngOnInit(): void {
     const doc = this.evaluation();
     this.sections.set(defaultSectionsForDocument(doc));
     if (evaluationModeOf(doc) === 'confirm') {
       this.tradesSplit.set('holdout');
       this.stagesSplit.set('holdout');
     }
-    this.dialogRef?.nativeElement.showModal();
   }
 
   protected isChecked(section: ReportSection): boolean {
@@ -101,20 +112,10 @@ export class ReportExportComponent implements AfterViewInit {
       this.format(),
     );
     downloadTextFile(filename, content, exportMimeType(this.format()));
-    this.closeDialog();
+    this.visible.set(false);
   }
 
-  protected closeDialog(): void {
-    this.dialogRef?.nativeElement.close();
-  }
-
-  protected onDialogClosed(): void {
+  protected onHide(): void {
     this.closed.emit();
-  }
-
-  protected onBackdropClick(event: MouseEvent): void {
-    if (event.target === this.dialogRef?.nativeElement) {
-      this.closeDialog();
-    }
   }
 }

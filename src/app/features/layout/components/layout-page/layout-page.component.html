@@ -15,9 +15,9 @@
     [error]="error()"
     (startBot)="startBot()"
     (stopBot)="stopBot()"
-    (changeBackend)="changeBackend()"
   />
   <main class="layout__main">
+    <h1 class="sr-only">Trading desk</h1>
     <app-chart-view
       class="layout__chart"
       [breakEvenPrice]="breakEvenPrice()"

@@ -87,12 +87,6 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
     });
   }
 
-  protected changeBackend(): void {
-    this.closeStreams();
-    this.store.clear();
-    void this.router.navigateByUrl('/');
-  }
-
   private openStreams(): void {
     this.candleStream.start();
     this.bookStream.start();

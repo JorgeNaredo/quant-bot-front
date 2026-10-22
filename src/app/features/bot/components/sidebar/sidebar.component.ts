@@ -32,7 +32,6 @@ export class SidebarComponent {
 
   @Output() startBot = new EventEmitter<void>();
   @Output() stopBot = new EventEmitter<void>();
-  @Output() changeBackend = new EventEmitter<void>();
 
   protected readonly collapsed = signal(false);
 

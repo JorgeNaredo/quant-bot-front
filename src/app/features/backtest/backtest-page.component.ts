@@ -13,6 +13,11 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
+import { AccordionModule } from 'primeng/accordion';
+import { ButtonModule } from 'primeng/button';
+import { MessageModule } from 'primeng/message';
+import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
 import {
   EvaluationDocument,
   ReportEntry,
@@ -30,20 +35,31 @@ import {
   buildMonthlyBars,
   collectTrades,
   evaluationModeOf,
-  exitCountOf,
   filterByStrategy,
-  formatNumber,
   formatRunHeader,
-  gradeOf,
-  gradedOf,
   strategyOptions,
 } from './report-data';
 import { ReportExportComponent } from './report-export/report-export.component';
+import { ResultComparisonTableComponent } from './components/result-comparison-table/result-comparison-table.component';
+import { StrategyDetailsComponent } from './components/strategy-details/strategy-details.component';
+import { StrategySummaryTableComponent } from './components/strategy-summary-table/strategy-summary-table.component';
 
 @Component({
   selector: 'app-backtest-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, ReportExportComponent],
+  imports: [
+    FormsModule,
+    DecimalPipe,
+    ReportExportComponent,
+    AccordionModule,
+    ButtonModule,
+    MessageModule,
+    TableModule,
+    TagModule,
+    StrategySummaryTableComponent,
+    StrategyDetailsComponent,
+    ResultComparisonTableComponent,
+  ],
   templateUrl: './backtest-page.component.html',
   styleUrl: './backtest-page.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -95,6 +111,12 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     this.comparisonRows().filter((row) => row.reasons.length > 0),
   );
 
+  protected readonly trainRows = computed(() => this.filteredStrategies('train'));
+  protected readonly walkForwardRows = computed(() => this.filteredStrategies('walkForward'));
+  protected readonly holdoutRows = computed(() => this.filteredStrategies('holdout'));
+  protected readonly stageRows = computed(() => this.filteredStrategies(this.tradeSplit()));
+  protected readonly tradeRows = computed(() => this.trades(this.tradeSplit()));
+
   private chart: IChartApi | null = null;
   private isSeries: ISeriesApi<'Histogram'> | null = null;
   private oosSeries: ISeriesApi<'Histogram'> | null = null;
@@ -109,11 +131,6 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.chart?.remove();
-  }
-
-  protected disconnect(): void {
-    this.store.clear();
-    this.router.navigateByUrl('/');
   }
 
   protected run(): void {
@@ -248,31 +265,33 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     return formatRunHeader(label, this.evaluation()?.[split]?.run);
   }
 
-  protected grade(row: StrategyReport | undefined, key: string): string {
-    return gradeOf(row, key);
-  }
-
-  protected graded(
-    row: StrategyReport,
-    key: string,
-    value: number | undefined | null,
-    digits: number,
-  ): string {
-    return gradedOf(row, key, value, digits);
-  }
-
-  protected num(value: number | undefined | null, digits: number): string {
-    return formatNumber(value, digits);
-  }
-
-  protected exitCount(row: StrategyReport, reason: string): number {
-    return exitCountOf(row, reason);
-  }
-
   protected trades(split: SplitKey): TradeRow[] {
     const doc = this.evaluation();
     if (!doc) return [];
     return collectTrades(doc, split, this.tradesStrategy());
+  }
+
+  protected tradeSideSeverity(side: string | undefined): 'success' | 'danger' | 'secondary' {
+    if (side === 'BUY' || side === 'LONG') return 'success';
+    if (side === 'SELL' || side === 'SHORT') return 'danger';
+    return 'secondary';
+  }
+
+  protected exitSeverity(
+    reason: string | undefined,
+  ): 'success' | 'danger' | 'warn' | 'info' | 'secondary' {
+    switch (reason) {
+      case 'TARGET':
+        return 'success';
+      case 'STOP':
+        return 'danger';
+      case 'LIQUIDATION':
+        return 'warn';
+      case 'SIGNAL':
+        return 'info';
+      default:
+        return 'secondary';
+    }
   }
 
   private refreshReportList(selectNewest = false): void {
@@ -306,17 +325,17 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
       if (!this.chart) {
         this.chart = createChart(host, {
           height: 260,
-          layout: { background: { color: '#151922' }, textColor: '#d1d4dc' },
-          grid: { vertLines: { color: '#1f232b' }, horzLines: { color: '#1f232b' } },
-          rightPriceScale: { borderColor: '#2a2e39' },
-          timeScale: { borderColor: '#2a2e39' },
+          layout: { background: { color: '#111827' }, textColor: '#94a3b8' },
+          grid: { vertLines: { color: '#1e2940' }, horzLines: { color: '#1e2940' } },
+          rightPriceScale: { borderColor: '#263145' },
+          timeScale: { borderColor: '#263145' },
         });
         this.isSeries = this.chart.addHistogramSeries({
-          color: '#3d7eff',
+          color: '#4c8dff',
           priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
         });
         this.oosSeries = this.chart.addHistogramSeries({
-          color: '#26a69a',
+          color: '#22c55e',
           priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
         });
       }
@@ -324,12 +343,12 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
       const isMapped = bars.map((b) => ({
         time: monthToUtc(b.month),
         value: b.is,
-        color: b.is >= 0 ? '#3d7eff' : '#5b7bb8',
+        color: b.is >= 0 ? '#4c8dff' : '#365fa8',
       }));
       const oosMapped = bars.map((b) => ({
         time: monthToUtc(b.month),
         value: b.oos,
-        color: b.oos >= 0 ? '#26a69a' : '#6f9e97',
+        color: b.oos >= 0 ? '#22c55e' : '#3f7a55',
       }));
       this.isSeries?.setData(isMapped as never);
       this.oosSeries?.setData(oosMapped as never);

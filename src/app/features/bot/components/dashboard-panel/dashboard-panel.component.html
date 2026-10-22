@@ -1,44 +1,54 @@
 <div class="dashboard">
   <section class="dashboard__col">
     <div class="col__header">
-      <h3>Specs</h3>
+      <h2>Specs</h2>
+      <span class="col__count">{{ specs().length }}</span>
     </div>
     <div class="col__list">
       @for (spec of specs(); track spec.id) {
-        <div class="spec__card">
+        <article class="spec__card">
           <div class="spec__title">
-            <strong>{{ spec.id }}</strong>
-            <span class="tag">{{ spec.mode }}</span>
-            <span class="tag" [class]="statusTagClass(spec.machineState)">{{ spec.machineState }}</span>
+            <strong class="mono">{{ spec.id }}</strong>
+            <p-tag [value]="spec.mode" severity="secondary" />
+            <p-tag [value]="spec.machineState" [severity]="stateSeverity(spec.machineState)" />
           </div>
           <div class="spec__meta">
-            <span>L stage {{ spec.stageIndexLong }} (wait {{ spec.barsInWaitLong }})</span>
-            <span>S stage {{ spec.stageIndexShort }} (wait {{ spec.barsInWaitShort }})</span>
-            <span>barsInState {{ spec.barsInState }}</span>
+            <span>L stage {{ spec.stageIndexLong }} <span class="spec__wait">wait {{ spec.barsInWaitLong }}</span></span>
+            <span>S stage {{ spec.stageIndexShort }} <span class="spec__wait">wait {{ spec.barsInWaitShort }}</span></span>
+            <span>barsInState <span class="mono">{{ spec.barsInState }}</span></span>
           </div>
           @if (spec.position; as pos) {
             <div class="spec__pos">
-              {{ pos.side }} @ {{ pos.entryPrice | number:'1.2-2' }}
-              · SL {{ pos.stopPrice | number:'1.2-2' }}
-              · size {{ pos.size | number:'1.4-4' }}
+              <span class="mono">{{ pos.side }} @ {{ pos.entryPrice | number:'1.2-2' }}</span>
+              <span>SL <span class="mono">{{ pos.stopPrice | number:'1.2-2' }}</span></span>
+              <span>size <span class="mono">{{ pos.size | number:'1.4-4' }}</span></span>
             </div>
           }
-          <div class="spec__decision">Última: {{ actionLabel(spec.lastDecision) }}</div>
-        </div>
+          <div class="spec__decision">
+            <span class="spec__decision-label">Última</span>
+            <p-tag [value]="actionLabel(spec.lastDecision)" [severity]="actionSeverity(spec.lastDecision)" />
+          </div>
+        </article>
       } @empty {
-        <p class="col__empty">Esperando specs…</p>
+        <p class="col__empty">
+          <i class="pi pi-spin pi-spinner" aria-hidden="true"></i>
+          Esperando specs…
+        </p>
       }
     </div>
   </section>
 
   <section class="dashboard__col">
-    <h3>Acciones</h3>
+    <div class="col__header">
+      <h2>Acciones</h2>
+      <span class="col__count">{{ decisions().length }}</span>
+    </div>
     <div class="col__list">
       @for (dm of decisions(); track $index) {
         <div class="decision__entry">
-          <span class="tag">{{ actionLabel(dm.action) }}</span>
+          <p-tag [value]="actionLabel(dm.action)" [severity]="actionSeverity(dm.action)" />
           <span class="decision__reason">{{ dm.strategyId }}</span>
-          <span class="decision__time">{{ formatTime(dm.ts) }}</span>
+          <span class="decision__time mono">{{ formatTime(dm.ts) }}</span>
         </div>
       } @empty {
         <p class="col__empty">Sin acciones aún</p>
@@ -47,30 +57,41 @@
   </section>
 
   <section class="dashboard__col dashboard__col--orders">
-    <h3>Órdenes</h3>
+    <div class="col__header">
+      <h2>Órdenes</h2>
+      <span class="col__count">{{ activeOrders().length }}</span>
+    </div>
+
     <div class="orders__subsection">
       <h4 class="orders__subtitle">Activas</h4>
       @if (activeOrders().length === 0) {
         <p class="col__empty">Sin posición abierta</p>
       } @else {
-        <div class="orders-table">
-          <div class="orders__header">
-            <span>Strat</span>
-            <span>Lado</span>
-            <span>Entrada</span>
-            <span>SL</span>
-            <span>TP</span>
-          </div>
-          @for (o of activeOrders(); track o.id) {
-            <div class="orders__row">
-              <span>{{ o.strategyId }}</span>
-              <span class="tag">{{ o.side }}</span>
-              <span>{{ o.price | number:'1.2-2' }}</span>
-              <span>{{ o.stop | number:'1.2-2' }}</span>
-              <span>{{ o.target != null ? (o.target | number:'1.2-2') : '—' }}</span>
-            </div>
-          }
-        </div>
+        <p-table
+          [value]="activeOrders()"
+          dataKey="id"
+          styleClass="dense-table"
+          size="small"
+          stripedRows>
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Strat</th>
+              <th>Lado</th>
+              <th>Entrada</th>
+              <th>SL</th>
+              <th>TP</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-o>
+            <tr>
+              <td class="mono">{{ o.strategyId }}</td>
+              <td><p-tag [value]="o.side" [severity]="sideSeverity(o.side)" /></td>
+              <td class="mono">{{ o.price | number:'1.2-2' }}</td>
+              <td class="mono">{{ o.stop | number:'1.2-2' }}</td>
+              <td class="mono">{{ o.target != null ? (o.target | number:'1.2-2') : '—' }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
       }
     </div>
 
@@ -81,24 +102,33 @@
       @if (closedOrders().length === 0) {
         <p class="col__empty">Sin cierres</p>
       } @else {
-        <div class="orders-table">
-          <div class="orders__header">
-            <span>Strat</span>
-            <span>Lado</span>
-            <span>Exit</span>
-            <span>PnL</span>
-            <span>Motivo</span>
-          </div>
-          @for (o of closedOrders(); track o.id) {
-            <div class="orders__row">
-              <span>{{ o.strategyId }}</span>
-              <span class="tag">{{ o.side }}</span>
-              <span>{{ o.price | number:'1.2-2' }}</span>
-              <span>{{ o.pnl | number:'1.2-2' }}</span>
-              <span class="tag tag--status">{{ o.status }}</span>
-            </div>
-          }
-        </div>
+        <p-table
+          [value]="closedOrders()"
+          dataKey="id"
+          styleClass="dense-table"
+          size="small"
+          stripedRows>
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Strat</th>
+              <th>Lado</th>
+              <th>Exit</th>
+              <th>PnL</th>
+              <th>Motivo</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-o>
+            <tr>
+              <td class="mono">{{ o.strategyId }}</td>
+              <td><p-tag [value]="o.side" [severity]="sideSeverity(o.side)" /></td>
+              <td class="mono">{{ o.price | number:'1.2-2' }}</td>
+              <td class="mono" [class.pnl--positive]="(o.pnl ?? 0) >= 0" [class.pnl--negative]="(o.pnl ?? 0) < 0">
+                {{ o.pnl | number:'1.2-2' }}
+              </td>
+              <td><p-tag [value]="o.status" severity="secondary" /></td>
+            </tr>
+          </ng-template>
+        </p-table>
       }
     </div>
   </section>

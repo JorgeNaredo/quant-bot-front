@@ -1,6 +1,11 @@
-<aside class="sidebar">
-  <button type="button" class="sidebar__toggle" (click)="onToggle()">
-    ☰
+<aside class="sidebar" aria-label="Panel de control del bot">
+  <button
+    type="button"
+    class="sidebar__toggle"
+    aria-label="Alternar panel lateral"
+    [attr.aria-expanded]="!collapsed()"
+    (click)="onToggle()">
+    <i class="pi pi-bars" aria-hidden="true"></i>
   </button>
 
   @if (!collapsed()) {
@@ -20,7 +25,8 @@
           [disabled]="busy || operating"
           (click)="startBot.emit()"
         >
-          ▶ Start
+          <i class="pi pi-play" aria-hidden="true"></i>
+          Iniciar
         </button>
         <button
           type="button"
@@ -28,21 +34,27 @@
           [disabled]="busy || !operating"
           (click)="stopBot.emit()"
         >
-          ■ Stop
+          <i class="pi pi-stop" aria-hidden="true"></i>
+          Detener
         </button>
-        <button type="button" class="btn" (click)="changeBackend.emit()">
-          Cambiar backend
-        </button>
-        <p class="sidebar__state">
-          Streams: {{ connected ? 'ON' : 'OFF' }} · Bot: {{ operating ? 'OPERATING' : 'IDLE' }}
+        <p class="sidebar__state" aria-live="polite">
+          <span class="sidebar__state-item">
+            <span class="sidebar__dot" [class.sidebar__dot--on]="connected" aria-hidden="true"></span>
+            Streams {{ connected ? 'ON' : 'OFF' }}
+          </span>
+          <span class="sidebar__state-sep" aria-hidden="true">·</span>
+          <span class="sidebar__state-item">
+            <span class="sidebar__dot" [class.sidebar__dot--operating]="operating" aria-hidden="true"></span>
+            Bot {{ operating ? 'OPERATING' : 'IDLE' }}
+          </span>
         </p>
         @if (error) {
-          <p class="sidebar__error">{{ error }}</p>
+          <p class="sidebar__error" role="alert">{{ error }}</p>
         }
       </section>
 
       <section class="sidebar__account">
-        <h3>Cuenta</h3>
+        <h2>Cuenta</h2>
         @if (accountInfo; as acc) {
           <div class="account__grid">
             <span class="account__label">Saldo</span>
@@ -80,7 +92,7 @@
       </section>
 
       <section class="sidebar__profit">
-        <h3>P&L ASEGURADO X SL</h3>
+        <h2>P&L ASEGURADO X SL</h2>
         @if (profitLocked !== null) {
           <div
             class="profit__value"

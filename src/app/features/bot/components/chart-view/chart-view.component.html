@@ -1,1 +1,13 @@
-<div #chartContainer class="chart-container"></div>
+<div class="chart-shell">
+  <div
+    #chartContainer
+    class="chart-container"
+    role="img"
+    aria-label="Gráfico de velas en vivo con marcadores de entrada, stop loss, take profit y break even"></div>
+  <div class="chart__legend" aria-hidden="true">
+    <span class="chart__legend-item"><span class="chart__dot chart__dot--entry"></span>Entry</span>
+    <span class="chart__legend-item"><span class="chart__dot chart__dot--sl"></span>SL</span>
+    <span class="chart__legend-item"><span class="chart__dot chart__dot--tp"></span>TP</span>
+    <span class="chart__legend-item"><span class="chart__dot chart__dot--be"></span>BE</span>
+  </div>
+</div>

@@ -9,6 +9,8 @@ import {
 } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { Subscription } from 'rxjs';
+import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
 import { BookEvent, SpecState } from '../../../../shared/models/bot-api.model';
 import { BookStreamService } from '../../../../shared/services/book-stream.service';
 import { SpecsStreamService } from '../../../../shared/services/specs-stream.service';
@@ -28,7 +30,7 @@ interface OrderRow {
 @Component({
   selector: 'app-dashboard-panel',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, TableModule, TagModule],
   templateUrl: './dashboard-panel.component.html',
   styleUrl: './dashboard-panel.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -63,17 +65,32 @@ export class DashboardPanelComponent implements OnDestroy {
     this.bookSub?.unsubscribe();
   }
 
-  protected statusTagClass(machineState: string | null | undefined): string {
+  protected stateSeverity(machineState: string | null | undefined): 'success' | 'danger' | 'warn' | 'secondary' {
     switch (machineState) {
       case 'ARMED_LONG':
-        return 'tag tag--armed-long';
+        return 'success';
       case 'ARMED_SHORT':
-        return 'tag tag--armed-short';
+        return 'danger';
       case 'ARMED_BOTH':
-        return 'tag tag--armed-both';
+        return 'warn';
       default:
-        return 'tag tag--status';
+        return 'secondary';
     }
+  }
+
+  protected sideSeverity(side: string | null | undefined): 'success' | 'danger' | 'secondary' {
+    if (side === 'BUY' || side === 'LONG') return 'success';
+    if (side === 'SELL' || side === 'SHORT') return 'danger';
+    return 'secondary';
+  }
+
+  protected actionSeverity(action: string | null | undefined): 'success' | 'danger' | 'warn' | 'info' | 'secondary' {
+    if (!action) return 'secondary';
+    if (action === 'ENTER_LONG') return 'success';
+    if (action === 'ENTER_SHORT' || action === 'closeAll') return 'danger';
+    if (action === 'closePartial') return 'warn';
+    if (action.startsWith('move') || action === 'activateTrailing') return 'info';
+    return 'secondary';
   }
 
   protected actionLabel(action: string | null | undefined): string {

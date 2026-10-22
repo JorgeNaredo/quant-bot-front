@@ -97,24 +97,24 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
       width: container.clientWidth,
       height: container.clientHeight,
       layout: {
-        background: { type: ColorType.Solid, color: '#0e1116' },
-        textColor: '#d1d4dc',
+        background: { type: ColorType.Solid, color: '#0b0f17' },
+        textColor: '#94a3b8',
       },
       localization: {
         locale: 'en-US',
         priceFormatter: (price: number) => price.toFixed(PRICE_PRECISION),
       },
       grid: {
-        vertLines: { color: '#1f232b', style: LineStyle.Dotted },
-        horzLines: { color: '#1f232b', style: LineStyle.Dotted },
+        vertLines: { color: '#1a2233', style: LineStyle.Dotted },
+        horzLines: { color: '#1a2233', style: LineStyle.Dotted },
       },
       timeScale: {
         timeVisible: true,
         secondsVisible: true,
-        borderColor: '#2a2e39',
+        borderColor: '#263145',
       },
       rightPriceScale: {
-        borderColor: '#2a2e39',
+        borderColor: '#263145',
       },
       crosshair: {
         mode: 1,
@@ -122,11 +122,11 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     });
 
     this.series = this.chart.addCandlestickSeries({
-      upColor: '#26a69a',
-      downColor: '#ef5350',
+      upColor: '#22c55e',
+      downColor: '#ef4444',
       borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
+      wickUpColor: '#22c55e',
+      wickDownColor: '#ef4444',
       priceFormat: {
         type: 'price',
         precision: PRICE_PRECISION,
@@ -142,7 +142,7 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
       scaleMargins: { top: 0.85, bottom: 0 },
     });
     this.volumeSeries.applyOptions({
-      color: '#26a69a80',
+      color: '#22c55e80',
     });
   }
 
@@ -192,21 +192,21 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     this.orderLines = {
       entry: this.series.createPriceLine({
         price: event.entryPrice,
-        color: '#ffd54f',
+        color: '#f59e0b',
         lineWidth: 2,
         lineStyle: LineStyle.Solid,
         axisLabelVisible: true,
       }),
       stopLoss: this.series.createPriceLine({
         price: stop,
-        color: '#ef5350',
+        color: '#ef4444',
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
       }),
       takeProfit: this.series.createPriceLine({
         price: target,
-        color: '#26a69a',
+        color: '#22c55e',
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
@@ -237,7 +237,7 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     if (!this.breakEvenSeries) {
       this.breakEvenSeries = this.series.createPriceLine({
         price,
-        color: '#9ea4b0',
+        color: '#94a3b8',
         lineWidth: 1,
         lineStyle: LineStyle.Dotted,
         axisLabelVisible: true,
@@ -298,7 +298,7 @@ private updateSeries(candle: Candle): void {
 	    });
 
 	    if (this.volumeSeries) {
-	      const volumeColor = candle.close >= candle.open ? '#26a69a80' : '#ef535080';
+	      const volumeColor = candle.close >= candle.open ? '#22c55e80' : '#ef444480';
 	      this.volumeSeries.update({
 	        time,
 	        value: candle.volume,

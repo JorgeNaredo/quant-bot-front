@@ -1,0 +1,117 @@
+<div class="detail-stack">
+  <section class="detail-block">
+    <h3 class="detail-title">Trades</h3>
+    <p-table
+      [value]="rows()"
+      dataKey="id"
+      styleClass="dense-table"
+      size="small"
+      stripedRows
+      [scrollable]="true"
+      [tableStyle]="{ 'min-width': '52rem' }">
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="id">Estrategia <p-sortIcon field="id" /></th>
+          <th>Al cierre</th>
+          <th pSortableColumn="winRatePct">Win% <p-sortIcon field="winRatePct" /></th>
+          <th pSortableColumn="winners">Ganadores <p-sortIcon field="winners" /></th>
+          <th pSortableColumn="avgWinR">R ganador <p-sortIcon field="avgWinR" /></th>
+          <th pSortableColumn="avgLossR">R perdedor <p-sortIcon field="avgLossR" /></th>
+          <th pSortableColumn="maxConsecutiveLosses">Racha <p-sortIcon field="maxConsecutiveLosses" /></th>
+          <th pSortableColumn="avgBarsInTrade">Velas <p-sortIcon field="avgBarsInTrade" /></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td class="mono">{{ row.id }}</td>
+          <td>{{ row.openAtEnd ? 'abierta' : 'plana' }}</td>
+          <td class="num">{{ num(row.winRatePct, 1) }}</td>
+          <td class="num">{{ num(row.winners, 0) }}</td>
+          <td class="num">{{ num(row.avgWinR, 2) }}</td>
+          <td class="num">{{ num(row.avgLossR, 2) }}</td>
+          <td class="num">{{ num(row.maxConsecutiveLosses, 0) }}</td>
+          <td class="num">{{ num(row.avgBarsInTrade, 1) }}</td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="8" class="table-empty">Sin filas para el filtro</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </section>
+
+  <section class="detail-block">
+    <h3 class="detail-title">Salidas</h3>
+    <p-table
+      [value]="rows()"
+      dataKey="id"
+      styleClass="dense-table"
+      size="small"
+      stripedRows
+      [scrollable]="true"
+      [tableStyle]="{ 'min-width': '32rem' }">
+      <ng-template pTemplate="header">
+        <tr>
+          <th>Estrategia</th>
+          <th>Liquidación</th>
+          <th>Stop</th>
+          <th>Target</th>
+          <th>Signal</th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td class="mono">{{ row.id }}</td>
+          <td class="num">{{ exitCount(row, 'LIQUIDATION') }}</td>
+          <td class="num">{{ exitCount(row, 'STOP') }}</td>
+          <td class="num">{{ exitCount(row, 'TARGET') }}</td>
+          <td class="num">{{ exitCount(row, 'SIGNAL') }}</td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="5" class="table-empty">Sin filas para el filtro</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </section>
+
+  <section class="detail-block">
+    <h3 class="detail-title">Curva</h3>
+    <p-table
+      [value]="rows()"
+      dataKey="id"
+      styleClass="dense-table"
+      size="small"
+      stripedRows
+      [scrollable]="true"
+      [tableStyle]="{ 'min-width': '38rem' }">
+      <ng-template pTemplate="header">
+        <tr>
+          <th pSortableColumn="id">Estrategia <p-sortIcon field="id" /></th>
+          <th pSortableColumn="maxDrawdownBars">DD velas <p-sortIcon field="maxDrawdownBars" /></th>
+          <th pSortableColumn="exposurePct">Exposición % <p-sortIcon field="exposurePct" /></th>
+          <th pSortableColumn="sharpePerBar">Sharpe/vela <p-sortIcon field="sharpePerBar" /></th>
+          <th pSortableColumn="sharpeAnnualized">Sharpe anual <p-sortIcon field="sharpeAnnualized" /></th>
+          <th pSortableColumn="probabilisticSharpe">PSR <p-sortIcon field="probabilisticSharpe" /></th>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="body" let-row>
+        <tr>
+          <td class="mono">{{ row.id }}</td>
+          <td class="num">{{ num(row.maxDrawdownBars, 0) }}</td>
+          <td class="num">{{ num(row.exposurePct, 1) }}</td>
+          <td class="num">{{ num(row.sharpePerBar, 4) }}</td>
+          <td class="num">{{ num(row.sharpeAnnualized, 2) }}</td>
+          <td class="num">{{ num(row.probabilisticSharpe, 2) }}</td>
+        </tr>
+      </ng-template>
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="6" class="table-empty">Sin filas para el filtro</td>
+        </tr>
+      </ng-template>
+    </p-table>
+  </section>
+</div>

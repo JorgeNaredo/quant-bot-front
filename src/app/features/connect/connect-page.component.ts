@@ -1,6 +1,9 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { ButtonModule } from 'primeng/button';
+import { InputTextModule } from 'primeng/inputtext';
+import { MessageModule } from 'primeng/message';
 import { BackendConfigService } from '../../shared/services/backend-config.service';
 import { BotApiService } from '../../shared/services/bot-api.service';
 import { SessionStoreService } from '../../shared/services/session-store.service';
@@ -8,7 +11,7 @@ import { SessionStoreService } from '../../shared/services/session-store.service
 @Component({
   selector: 'app-connect-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ButtonModule, InputTextModule, MessageModule],
   templateUrl: './connect-page.component.html',
   styleUrl: './connect-page.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -40,7 +43,7 @@ export class ConnectPageComponent {
         if (response.profile === 'backtest') {
           this.router.navigateByUrl('/backtest');
         } else {
-          this.router.navigateByUrl('/live');
+          this.router.navigateByUrl('/desk');
         }
       },
       error: (err) => {

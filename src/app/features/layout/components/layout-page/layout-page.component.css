@@ -1,7 +1,7 @@
 :host {
   display: block;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
@@ -13,12 +13,12 @@
 }
 
 .layout--paper {
-  outline: 3px solid #f0a040;
+  outline: 3px solid var(--warning);
   outline-offset: -3px;
 }
 
 .layout--live {
-  outline: 3px solid #26a69a;
+  outline: 3px solid var(--success);
   outline-offset: -3px;
 }
 

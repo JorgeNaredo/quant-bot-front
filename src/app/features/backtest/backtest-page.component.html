@@ -1,11 +1,12 @@
 <div class="bt">
   <header class="bt__header">
-    <div>
+    <div class="bt__heading">
       <h1>Backtest</h1>
       @if (session(); as s) {
         <p class="bt__meta">{{ s.symbol }} · {{ s.interval }} · {{ s.state }}</p>
       }
     </div>
+
     <div class="bt__actions">
       <label class="bt__select">
         Informe
@@ -21,67 +22,94 @@
           }
         </select>
       </label>
-      <button type="button" class="btn" [disabled]="!evaluation() || busy()" (click)="openExport()">Exportar</button>
-      <button type="button" class="btn" [disabled]="busy() || profiling() || checkingReachability()" (click)="checkReachability()">
-        @if (checkingReachability()) { Validando… } @else { Validar specs }
-      </button>
-      <button type="button" class="btn btn--primary" [disabled]="busy() || profiling() || checkingReachability()" (click)="run()">
-        @if (busy()) { Evaluando… } @else { Lanzar evaluación }
-      </button>
-      <button type="button" class="btn" [disabled]="busy() || profiling() || checkingReachability()" (click)="confirmHoldout()">
-        Confirmar holdout
-      </button>
-      <button type="button" class="btn" [disabled]="busy() || profiling() || checkingReachability()" (click)="profileCatalog()">
-        @if (profiling()) { Perfilando… } @else { Perfilar catálogo }
-      </button>
-      <button type="button" class="btn btn--ghost" (click)="disconnect()">Cambiar backend</button>
+
+      <p-button
+        label="Exportar"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="!evaluation() || busy()"
+        (onClick)="openExport()" />
+      <p-button
+        label="Validar specs"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="busy() || profiling() || checkingReachability()"
+        [loading]="checkingReachability()"
+        (onClick)="checkReachability()" />
+      <p-button
+        label="Lanzar evaluación"
+        [disabled]="busy() || profiling() || checkingReachability()"
+        [loading]="busy()"
+        (onClick)="run()" />
+      <p-button
+        label="Confirmar holdout"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="busy() || profiling() || checkingReachability()"
+        (onClick)="confirmHoldout()" />
+      <p-button
+        label="Perfilar catálogo"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="busy() || profiling() || checkingReachability()"
+        [loading]="profiling()"
+        (onClick)="profileCatalog()" />
     </div>
   </header>
 
   @if (error(); as err) {
-    <p class="bt__error">{{ err }}</p>
+    <p-message severity="error" [text]="err" styleClass="bt__message" />
   }
 
   @if (reachabilityOutcome(); as reach) {
     <section class="bt__section">
-      <details class="bt__details" open>
-        <summary>Alcanzabilidad de specs · {{ reach.symbol }}</summary>
-        @if (!reach.ok) {
-          <p class="bt__error">{{ reach.error || 'Falló la validación' }}</p>
-        } @else if (reach.report; as report) {
-          <p class="bt__meta bt__run">
-            {{ report.barCount }} barras · {{ report.firstBar }} → {{ report.lastBar }}
-          </p>
-          @if (report.unreachable.length === 0) {
-            <p class="bt__ok">Todas las specs son alcanzables en este dataset.</p>
-          } @else {
-            <p class="bt__warn">
-              {{ report.unreachable.length }} spec(s) semánticamente válidas pero no alcanzables
-              (alguna stage de entry nunca se cumple).
-            </p>
-            <div class="table">
-              <div class="table__head table__head--reach">
-                <span>#</span><span>spec</span><span>estado</span>
-              </div>
-              @for (id of report.unreachable; track id; let i = $index) {
-                <div class="table__row table__row--reach">
-                  <span>{{ i + 1 }}</span>
-                  <span>{{ id }}</span>
-                  <span class="tag tag--unreachable">unreachable</span>
-                </div>
-              }
-            </div>
-          }
+      <div class="bt__section-head">
+        <h2>Alcanzabilidad de specs</h2>
+        <span class="bt__count mono">{{ reach.symbol }}</span>
+      </div>
+      @if (!reach.ok) {
+        <p-message severity="error" [text]="reach.error || 'Falló la validación'" />
+      } @else if (reach.report; as report) {
+        <p class="bt__meta">{{ report.barCount }} barras · {{ report.firstBar }} → {{ report.lastBar }}</p>
+        @if (report.unreachable.length === 0) {
+          <p-message severity="success" text="Todas las specs son alcanzables en este dataset." />
+        } @else {
+          <p-message
+            severity="warn"
+            [text]="report.unreachable.length + ' spec(s) semánticamente válidas pero no alcanzables: alguna stage de entry nunca se cumple.'" />
+          <p-table
+            [value]="report.unreachable"
+            styleClass="dense-table"
+            size="small"
+            stripedRows>
+            <ng-template pTemplate="header">
+              <tr>
+                <th class="num">#</th>
+                <th>Spec</th>
+                <th>Estado</th>
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-id let-rowIndex="rowIndex">
+              <tr>
+                <td class="num">{{ rowIndex + 1 }}</td>
+                <td class="mono">{{ id }}</td>
+                <td><p-tag value="unreachable" severity="warn" /></td>
+              </tr>
+            </ng-template>
+          </p-table>
         }
-      </details>
+      }
     </section>
   }
 
   @if (profileOutcome(); as outcome) {
     <section class="bt__section">
-      <h2>Perfil de catálogo · {{ outcome.symbol }}</h2>
+      <div class="bt__section-head">
+        <h2>Perfil de catálogo</h2>
+        <span class="bt__count mono">{{ outcome.symbol }}</span>
+      </div>
       @if (!outcome.ok) {
-        <p class="bt__error">{{ outcome.error || 'Falló el perfil' }}</p>
+        <p-message severity="error" [text]="outcome.error || 'Falló el perfil'" />
       } @else if (outcome.summary; as summary) {
         <div class="profile">
           <p>ready {{ summary.ready }} · skipped {{ summary.skipped }} · ready% {{ summary.readyPct | number:'1.1-1' }}</p>
@@ -98,7 +126,7 @@
   }
 
   @if (evaluation(); as doc) {
-    <div class="bt__row bt__filter">
+    <div class="bt__filter">
       <label class="bt__select">
         Filtrar por estrategia
         <select [ngModel]="selectedStrategy()" (ngModelChange)="onStrategyChange($event)">
@@ -110,307 +138,70 @@
     </div>
 
     @if (!confirmMode()) {
-    <section class="bt__section">
-      <h2>Train</h2>
-      <p class="bt__meta bt__run">{{ runMeta('train') }}</p>
-      <div class="table">
-        <div class="table__head table__head--summary">
-          <span>estrategia</span><span>piso</span><span>muestra</span><span>DSR</span><span>E[R]</span>
-          <span>PF</span><span>DD%</span><span>trades</span><span>equity</span><span>ret%</span>
+      <section class="bt__section">
+        <div class="bt__section-head">
+          <h2>Train</h2>
+          <span class="bt__count mono">{{ trainRows().length }}</span>
         </div>
-        @for (row of filteredStrategies('train'); track row.id) {
-          <div class="table__row table__row--summary">
-            <span>{{ row.id }}</span>
-            <span>{{ grade(row, 'floor') }}</span>
-            <span>{{ row.sampleEnough ? 'sí' : 'no' }}</span>
-            <span>{{ graded(row, 'deflatedSharpe', row.deflatedSharpe, 2) }}</span>
-            <span>{{ graded(row, 'expectancyR', row.expectancyR, 3) }}</span>
-            <span>{{ graded(row, 'profitFactor', row.profitFactor, 2) }}</span>
-            <span>{{ graded(row, 'maxDrawdownPct', row.maxDrawdownPct, 1) }}</span>
-            <span>{{ graded(row, 'closedTrades', row.closedTrades, 0) }}</span>
-            <span>{{ num(row.finalEquity, 2) }}</span>
-            <span>{{ num(row.returnPct, 1) }}</span>
-          </div>
-        } @empty {
-          <p class="empty">Sin estrategias</p>
-        }
-      </div>
+        <p class="bt__meta bt__run mono">{{ runMeta('train') }}</p>
+        <app-strategy-summary-table [rows]="trainRows()" />
 
-      <details class="bt__details">
-        <summary>Detalle · Trades / Salidas / Curva</summary>
-        <h3 class="bt__sub">Trades</h3>
-        <div class="table">
-          <div class="table__head table__head--trades-agg">
-            <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
-            <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
-          </div>
-          @for (row of filteredStrategies('train'); track row.id) {
-            <div class="table__row table__row--trades-agg">
-              <span>{{ row.id }}</span>
-              <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
-              <span>{{ num(row.winRatePct, 1) }}</span>
-              <span>{{ num(row.winners, 0) }}</span>
-              <span>{{ num(row.avgWinR, 2) }}</span>
-              <span>{{ num(row.avgLossR, 2) }}</span>
-              <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
-              <span>{{ num(row.avgBarsInTrade, 1) }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
-        </div>
+        <p-accordion [multiple]="true" styleClass="bt-accordion">
+          <p-accordion-panel value="detail">
+            <p-accordion-header>Detalle · Trades / Salidas / Curva</p-accordion-header>
+            <p-accordion-content>
+              <app-strategy-details [rows]="trainRows()" />
+            </p-accordion-content>
+          </p-accordion-panel>
+        </p-accordion>
+      </section>
 
-        <h3 class="bt__sub">Salidas</h3>
-        <div class="table">
-          <div class="table__head table__head--exits">
-            <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
-          </div>
-          @for (row of filteredStrategies('train'); track row.id) {
-            <div class="table__row table__row--exits">
-              <span>{{ row.id }}</span>
-              <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
-              <span>{{ exitCount(row, 'STOP') }}</span>
-              <span>{{ exitCount(row, 'TARGET') }}</span>
-              <span>{{ exitCount(row, 'SIGNAL') }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
+      <section class="bt__section">
+        <div class="bt__section-head">
+          <h2>Walk-forward</h2>
+          <span class="bt__count mono">{{ walkForwardRows().length }}</span>
         </div>
+        <p class="bt__meta bt__run mono">{{ runMeta('walkForward') }}</p>
+        <app-strategy-summary-table [rows]="walkForwardRows()" />
 
-        <h3 class="bt__sub">Curva</h3>
-        <div class="table">
-          <div class="table__head table__head--curve">
-            <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
-            <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
-          </div>
-          @for (row of filteredStrategies('train'); track row.id) {
-            <div class="table__row table__row--curve">
-              <span>{{ row.id }}</span>
-              <span>{{ num(row.maxDrawdownBars, 0) }}</span>
-              <span>{{ num(row.exposurePct, 1) }}</span>
-              <span>{{ num(row.sharpePerBar, 4) }}</span>
-              <span>{{ num(row.sharpeAnnualized, 2) }}</span>
-              <span>{{ num(row.probabilisticSharpe, 2) }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
-        </div>
-      </details>
-    </section>
-    }
-
-    @if (!confirmMode()) {
-    <section class="bt__section">
-      <h2>Walk-forward</h2>
-      <p class="bt__meta bt__run">{{ runMeta('walkForward') }}</p>
-      <div class="table">
-        <div class="table__head table__head--summary">
-          <span>estrategia</span><span>piso</span><span>muestra</span><span>DSR</span><span>E[R]</span>
-          <span>PF</span><span>DD%</span><span>trades</span><span>equity</span><span>ret%</span>
-        </div>
-        @for (row of filteredStrategies('walkForward'); track row.id) {
-          <div class="table__row table__row--summary">
-            <span>{{ row.id }}</span>
-            <span>{{ grade(row, 'floor') }}</span>
-            <span>{{ row.sampleEnough ? 'sí' : 'no' }}</span>
-            <span>{{ graded(row, 'deflatedSharpe', row.deflatedSharpe, 2) }}</span>
-            <span>{{ graded(row, 'expectancyR', row.expectancyR, 3) }}</span>
-            <span>{{ graded(row, 'profitFactor', row.profitFactor, 2) }}</span>
-            <span>{{ graded(row, 'maxDrawdownPct', row.maxDrawdownPct, 1) }}</span>
-            <span>{{ graded(row, 'closedTrades', row.closedTrades, 0) }}</span>
-            <span>{{ num(row.finalEquity, 2) }}</span>
-            <span>{{ num(row.returnPct, 1) }}</span>
-          </div>
-        } @empty {
-          <p class="empty">Sin estrategias</p>
-        }
-      </div>
-
-      <details class="bt__details">
-        <summary>Detalle · Trades / Salidas / Curva</summary>
-        <h3 class="bt__sub">Trades</h3>
-        <div class="table">
-          <div class="table__head table__head--trades-agg">
-            <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
-            <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
-          </div>
-          @for (row of filteredStrategies('walkForward'); track row.id) {
-            <div class="table__row table__row--trades-agg">
-              <span>{{ row.id }}</span>
-              <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
-              <span>{{ num(row.winRatePct, 1) }}</span>
-              <span>{{ num(row.winners, 0) }}</span>
-              <span>{{ num(row.avgWinR, 2) }}</span>
-              <span>{{ num(row.avgLossR, 2) }}</span>
-              <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
-              <span>{{ num(row.avgBarsInTrade, 1) }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
-        </div>
-
-        <h3 class="bt__sub">Salidas</h3>
-        <div class="table">
-          <div class="table__head table__head--exits">
-            <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
-          </div>
-          @for (row of filteredStrategies('walkForward'); track row.id) {
-            <div class="table__row table__row--exits">
-              <span>{{ row.id }}</span>
-              <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
-              <span>{{ exitCount(row, 'STOP') }}</span>
-              <span>{{ exitCount(row, 'TARGET') }}</span>
-              <span>{{ exitCount(row, 'SIGNAL') }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
-        </div>
-
-        <h3 class="bt__sub">Curva</h3>
-        <div class="table">
-          <div class="table__head table__head--curve">
-            <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
-            <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
-          </div>
-          @for (row of filteredStrategies('walkForward'); track row.id) {
-            <div class="table__row table__row--curve">
-              <span>{{ row.id }}</span>
-              <span>{{ num(row.maxDrawdownBars, 0) }}</span>
-              <span>{{ num(row.exposurePct, 1) }}</span>
-              <span>{{ num(row.sharpePerBar, 4) }}</span>
-              <span>{{ num(row.sharpeAnnualized, 2) }}</span>
-              <span>{{ num(row.probabilisticSharpe, 2) }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
-        </div>
-      </details>
-    </section>
+        <p-accordion [multiple]="true" styleClass="bt-accordion">
+          <p-accordion-panel value="detail">
+            <p-accordion-header>Detalle · Trades / Salidas / Curva</p-accordion-header>
+            <p-accordion-content>
+              <app-strategy-details [rows]="walkForwardRows()" />
+            </p-accordion-content>
+          </p-accordion-panel>
+        </p-accordion>
+      </section>
     }
 
     @if (confirmMode()) {
-    <section class="bt__section">
-      <h2>Holdout</h2>
-      <p class="bt__meta bt__run">{{ runMeta('holdout') }}</p>
-      <div class="table">
-        <div class="table__head table__head--summary">
-          <span>estrategia</span><span>piso</span><span>muestra</span><span>DSR</span><span>E[R]</span>
-          <span>PF</span><span>DD%</span><span>trades</span><span>equity</span><span>ret%</span>
+      <section class="bt__section">
+        <div class="bt__section-head">
+          <h2>Holdout</h2>
+          <span class="bt__count mono">{{ holdoutRows().length }}</span>
         </div>
-        @for (row of filteredStrategies('holdout'); track row.id) {
-          <div class="table__row table__row--summary">
-            <span>{{ row.id }}</span>
-            <span>{{ grade(row, 'floor') }}</span>
-            <span>{{ row.sampleEnough ? 'sí' : 'no' }}</span>
-            <span>{{ graded(row, 'deflatedSharpe', row.deflatedSharpe, 2) }}</span>
-            <span>{{ graded(row, 'expectancyR', row.expectancyR, 3) }}</span>
-            <span>{{ graded(row, 'profitFactor', row.profitFactor, 2) }}</span>
-            <span>{{ graded(row, 'maxDrawdownPct', row.maxDrawdownPct, 1) }}</span>
-            <span>{{ graded(row, 'closedTrades', row.closedTrades, 0) }}</span>
-            <span>{{ num(row.finalEquity, 2) }}</span>
-            <span>{{ num(row.returnPct, 1) }}</span>
-          </div>
-        } @empty {
-          <p class="empty">Sin estrategias</p>
-        }
-      </div>
+        <p class="bt__meta bt__run mono">{{ runMeta('holdout') }}</p>
+        <app-strategy-summary-table [rows]="holdoutRows()" />
 
-      <details class="bt__details">
-        <summary>Detalle · Trades / Salidas / Curva</summary>
-        <h3 class="bt__sub">Trades</h3>
-        <div class="table">
-          <div class="table__head table__head--trades-agg">
-            <span>estrategia</span><span>al cierre</span><span>win%</span><span>ganadores</span>
-            <span>R ganador</span><span>R perdedor</span><span>racha</span><span>velas</span>
-          </div>
-          @for (row of filteredStrategies('holdout'); track row.id) {
-            <div class="table__row table__row--trades-agg">
-              <span>{{ row.id }}</span>
-              <span>{{ row.openAtEnd ? 'abierta' : 'plana' }}</span>
-              <span>{{ num(row.winRatePct, 1) }}</span>
-              <span>{{ num(row.winners, 0) }}</span>
-              <span>{{ num(row.avgWinR, 2) }}</span>
-              <span>{{ num(row.avgLossR, 2) }}</span>
-              <span>{{ num(row.maxConsecutiveLosses, 0) }}</span>
-              <span>{{ num(row.avgBarsInTrade, 1) }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
-        </div>
-
-        <h3 class="bt__sub">Salidas</h3>
-        <div class="table">
-          <div class="table__head table__head--exits">
-            <span>estrategia</span><span>liquidacion</span><span>stop</span><span>target</span><span>signal</span>
-          </div>
-          @for (row of filteredStrategies('holdout'); track row.id) {
-            <div class="table__row table__row--exits">
-              <span>{{ row.id }}</span>
-              <span>{{ exitCount(row, 'LIQUIDATION') }}</span>
-              <span>{{ exitCount(row, 'STOP') }}</span>
-              <span>{{ exitCount(row, 'TARGET') }}</span>
-              <span>{{ exitCount(row, 'SIGNAL') }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
-        </div>
-
-        <h3 class="bt__sub">Curva</h3>
-        <div class="table">
-          <div class="table__head table__head--curve">
-            <span>estrategia</span><span>DD velas</span><span>exposicion %</span>
-            <span>Sharpe/vela</span><span>Sharpe anual</span><span>PSR</span>
-          </div>
-          @for (row of filteredStrategies('holdout'); track row.id) {
-            <div class="table__row table__row--curve">
-              <span>{{ row.id }}</span>
-              <span>{{ num(row.maxDrawdownBars, 0) }}</span>
-              <span>{{ num(row.exposurePct, 1) }}</span>
-              <span>{{ num(row.sharpePerBar, 4) }}</span>
-              <span>{{ num(row.sharpeAnnualized, 2) }}</span>
-              <span>{{ num(row.probabilisticSharpe, 2) }}</span>
-            </div>
-          } @empty {
-            <p class="empty">Sin filas para el filtro</p>
-          }
-        </div>
-      </details>
-    </section>
+        <p-accordion [multiple]="true" styleClass="bt-accordion">
+          <p-accordion-panel value="detail">
+            <p-accordion-header>Detalle · Trades / Salidas / Curva</p-accordion-header>
+            <p-accordion-content>
+              <app-strategy-details [rows]="holdoutRows()" />
+            </p-accordion-content>
+          </p-accordion-panel>
+        </p-accordion>
+      </section>
     }
 
     <section class="bt__section">
-      <h2>Resultado</h2>
-      <div class="table">
-        <div class="table__head table__head--result">
-          <span>estrategia</span>
-          <span>{{ confirmMode() ? 'oos' : 'train' }}</span>
-          <span>{{ confirmMode() ? 'holdout' : 'oos' }}</span>
-          <span>ΔDSR</span><span>ΔE[R]</span>
-          <span>Δtrades</span><span>Δret%</span><span>ΔDD%</span><span>verdict</span>
-        </div>
-        @for (row of comparisonRows(); track row.id) {
-          <div class="table__row table__row--result">
-            <span>{{ row.id }}</span>
-            <span>{{ row.leftFloor }}</span>
-            <span>{{ row.rightFloor }}</span>
-            <span>{{ num(row.delta?.deflatedSharpe, 2) }}</span>
-            <span>{{ num(row.delta?.expectancyR, 3) }}</span>
-            <span>{{ num(row.delta?.closedTrades, 0) }}</span>
-            <span>{{ num(row.delta?.returnPct, 1) }}</span>
-            <span>{{ num(row.delta?.maxDrawdownPct, 1) }}</span>
-            <span class="tag">{{ row.label }}</span>
-          </div>
-        } @empty {
-          <p class="empty">Sin comparación</p>
-        }
+      <div class="bt__section-head">
+        <h2>Resultado</h2>
+        <span class="bt__count mono">{{ comparisonRows().length }}</span>
       </div>
+      <app-result-comparison-table [rows]="comparisonRows()" [confirmMode]="confirmMode()" />
+
       @if (verdictReasons(); as reasons) {
         @if (reasons.length) {
           <div class="bt__reasons">
@@ -425,8 +216,8 @@
             <ul class="bt__reasons-list">
               @for (row of reasons; track row.id) {
                 <li class="bt__reasons-item">
-                  <span class="bt__reasons-id">{{ row.id }}</span>
-                  <span class="tag tag--verdict">{{ row.label }}</span>
+                  <span class="bt__reasons-id mono">{{ row.id }}</span>
+                  <p-tag [value]="row.label" severity="warn" />
                   <span class="bt__reasons-text">{{ row.reasons.join('; ') }}</span>
                 </li>
               }
@@ -437,7 +228,7 @@
     </section>
 
     <section class="bt__section">
-      <div class="bt__row">
+      <div class="bt__section-head">
         <h2>{{ confirmMode() ? 'Ganancias por mes (holdout)' : 'Ganancias por mes (IS / OOS)' }}</h2>
         <label class="bt__select">
           Estrategia (gráfico)
@@ -457,42 +248,61 @@
     </section>
 
     <section class="bt__section">
-      <div class="bt__row">
+      <div class="bt__section-head">
         <h2>Stages</h2>
         <div class="bt__tabs">
           @if (confirmMode()) {
-            <button type="button" [class.active]="tradeSplit() === 'holdout'" (click)="tradeSplit.set('holdout')">Holdout</button>
+            <p-button
+              label="Holdout"
+              size="small"
+              [outlined]="tradeSplit() !== 'holdout'"
+              (onClick)="tradeSplit.set('holdout')" />
           } @else {
-            <button type="button" [class.active]="tradeSplit() === 'train'" (click)="tradeSplit.set('train')">Train</button>
-            <button type="button" [class.active]="tradeSplit() === 'walkForward'" (click)="tradeSplit.set('walkForward')">Walk-forward</button>
+            <p-button
+              label="Train"
+              size="small"
+              [outlined]="tradeSplit() !== 'train'"
+              (onClick)="tradeSplit.set('train')" />
+            <p-button
+              label="Walk-forward"
+              size="small"
+              [outlined]="tradeSplit() !== 'walkForward'"
+              (onClick)="tradeSplit.set('walkForward')" />
           }
         </div>
       </div>
-      @for (row of filteredStrategies(tradeSplit()); track row.id) {
-        <details class="stages">
-          <summary>{{ row.id }}</summary>
-          <div class="stages__grid">
-            <div>
-              <h4>Long</h4>
-              @for (st of row.stages?.long ?? []; track $index) {
-                <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
-              }
-              <p>invalidated {{ row.stages?.invalidated?.long ?? 0 }}</p>
-            </div>
-            <div>
-              <h4>Short</h4>
-              @for (st of row.stages?.short ?? []; track $index) {
-                <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
-              }
-              <p>invalidated {{ row.stages?.invalidated?.short ?? 0 }}</p>
-            </div>
-          </div>
-        </details>
-      }
+
+      <p-accordion [multiple]="true" styleClass="bt-accordion">
+        @for (row of stageRows(); track row.id) {
+          <p-accordion-panel [value]="row.id">
+            <p-accordion-header>{{ row.id }}</p-accordion-header>
+            <p-accordion-content>
+              <div class="stages__grid">
+                <div>
+                  <h4>Long</h4>
+                  @for (st of row.stages?.long ?? []; track $index) {
+                    <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
+                  }
+                  <p>invalidated {{ row.stages?.invalidated?.long ?? 0 }}</p>
+                </div>
+                <div>
+                  <h4>Short</h4>
+                  @for (st of row.stages?.short ?? []; track $index) {
+                    <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
+                  }
+                  <p>invalidated {{ row.stages?.invalidated?.short ?? 0 }}</p>
+                </div>
+              </div>
+            </p-accordion-content>
+          </p-accordion-panel>
+        } @empty {
+          <p class="empty">Sin stages</p>
+        }
+      </p-accordion>
     </section>
 
     <section class="bt__section">
-      <div class="bt__row">
+      <div class="bt__section-head">
         <h2>Trades individuales ({{ tradeSplit() }})</h2>
         <label class="bt__select">
           Estrategia (trades)
@@ -503,24 +313,50 @@
           </select>
         </label>
       </div>
-      <div class="table table--trades">
-        <div class="table__head table__head--trades">
-          <span>Strat</span><span>Side</span><span>Entry</span><span>Exit</span><span>PnL</span><span>R</span><span>Reason</span>
-        </div>
-        @for (t of trades(tradeSplit()); track $index) {
-          <div class="table__row table__row--trades">
-            <span>{{ t.strategyId }}</span>
-            <span>{{ t.side }}</span>
-            <span>{{ t.entryTime }}</span>
-            <span>{{ t.exitTime }}</span>
-            <span [class.pos]="(t.netPnl ?? 0) >= 0" [class.neg]="(t.netPnl ?? 0) < 0">{{ t.netPnl | number:'1.2-2' }}</span>
-            <span>{{ t.netR | number:'1.2-2' }}</span>
-            <span>{{ t.reason }}</span>
-          </div>
-        } @empty {
-          <p class="empty">Sin trades</p>
-        }
-      </div>
+
+      <p-table
+        [value]="tradeRows()"
+        styleClass="dense-table"
+        size="small"
+        stripedRows
+        [paginator]="tradeRows().length > 50"
+        [rows]="50"
+        [rowsPerPageOptions]="[50, 100, 250]"
+        [scrollable]="true"
+        [tableStyle]="{ 'min-width': '54rem' }">
+        <ng-template pTemplate="header">
+          <tr>
+            <th pSortableColumn="strategyId">Strat <p-sortIcon field="strategyId" /></th>
+            <th pSortableColumn="side">Side <p-sortIcon field="side" /></th>
+            <th pSortableColumn="entryTime">Entry <p-sortIcon field="entryTime" /></th>
+            <th pSortableColumn="exitTime">Exit <p-sortIcon field="exitTime" /></th>
+            <th pSortableColumn="netPnl">PnL <p-sortIcon field="netPnl" /></th>
+            <th pSortableColumn="netR">R <p-sortIcon field="netR" /></th>
+            <th>Reason</th>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="body" let-t>
+          <tr>
+            <td class="mono">{{ t.strategyId }}</td>
+            <td><p-tag [value]="t.side" [severity]="tradeSideSeverity(t.side)" /></td>
+            <td class="mono">{{ t.entryTime }}</td>
+            <td class="mono">{{ t.exitTime }}</td>
+            <td
+              class="num"
+              [class.pos]="(t.netPnl ?? 0) >= 0"
+              [class.neg]="(t.netPnl ?? 0) < 0">
+              {{ t.netPnl | number:'1.2-2' }}
+            </td>
+            <td class="num">{{ t.netR | number:'1.2-2' }}</td>
+            <td><p-tag [value]="t.reason" [severity]="exitSeverity(t.reason)" /></td>
+          </tr>
+        </ng-template>
+        <ng-template pTemplate="emptymessage">
+          <tr>
+            <td colspan="7" class="empty">Sin trades</td>
+          </tr>
+        </ng-template>
+      </p-table>
     </section>
   } @else {
     <p class="bt__empty">Elige un informe o lanza la evaluación.</p>

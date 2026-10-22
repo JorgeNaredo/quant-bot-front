@@ -1,0 +1,42 @@
+<p-table
+  [value]="rows()"
+  dataKey="id"
+  styleClass="dense-table"
+  size="small"
+  stripedRows
+  [paginator]="rows().length > 25"
+  [rows]="25"
+  [scrollable]="true"
+  [tableStyle]="{ 'min-width': '58rem' }">
+  <ng-template pTemplate="header">
+    <tr>
+      <th pSortableColumn="id">Estrategia <p-sortIcon field="id" /></th>
+      <th>{{ leftLabel() }}</th>
+      <th>{{ rightLabel() }}</th>
+      <th pSortableColumn="delta.deflatedSharpe">ΔDSR <p-sortIcon field="delta.deflatedSharpe" /></th>
+      <th pSortableColumn="delta.expectancyR">ΔE[R] <p-sortIcon field="delta.expectancyR" /></th>
+      <th pSortableColumn="delta.closedTrades">Δtrades <p-sortIcon field="delta.closedTrades" /></th>
+      <th pSortableColumn="delta.returnPct">Δret% <p-sortIcon field="delta.returnPct" /></th>
+      <th pSortableColumn="delta.maxDrawdownPct">ΔDD% <p-sortIcon field="delta.maxDrawdownPct" /></th>
+      <th>Verdict</th>
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="body" let-row>
+    <tr>
+      <td class="mono">{{ row.id }}</td>
+      <td><span class="floor">{{ row.leftFloor }}</span></td>
+      <td><span class="floor">{{ row.rightFloor }}</span></td>
+      <td class="num">{{ num(row.delta?.deflatedSharpe, 2) }}</td>
+      <td class="num">{{ num(row.delta?.expectancyR, 3) }}</td>
+      <td class="num">{{ num(row.delta?.closedTrades, 0) }}</td>
+      <td class="num">{{ num(row.delta?.returnPct, 1) }}</td>
+      <td class="num">{{ num(row.delta?.maxDrawdownPct, 1) }}</td>
+      <td><p-tag [value]="row.label" [severity]="verdictSeverity(row.label)" /></td>
+    </tr>
+  </ng-template>
+  <ng-template pTemplate="emptymessage">
+    <tr>
+      <td colspan="9" class="table-empty">Sin comparación</td>
+    </tr>
+  </ng-template>
+</p-table>

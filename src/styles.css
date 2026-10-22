@@ -1,14 +1,64 @@
 :root {
   color-scheme: dark;
-  --bg: #0e1116;
-  --panel: #161a22;
-  --border: #2a2e39;
-  --text: #d1d4dc;
-  --text-muted: #8a8f9c;
-  --accent: #26a69a;
-  --danger: #ef5350;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
+
+  --surface-ground: #0b0f17;
+  --surface-card: #111827;
+  --surface-elevated: #182033;
+  --surface-hover: #1e2940;
+  --surface-border: #263145;
+  --surface-border-strong: #334155;
+
+  --text-color: #e8edf5;
+  --text-color-secondary: #94a3b8;
+  --text-color-muted: #64748b;
+
+  --primary: #4c8dff;
+  --primary-hover: #6ba4ff;
+  --primary-active: #3b7df5;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --info: #38bdf8;
+
+  --font-sans: "Fira Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Fira Code", "JetBrains Mono", ui-monospace, SFMono-Regular,
+    Menlo, Consolas, monospace;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.55);
+  --shadow-md: 0 8px 24px rgba(2, 6, 23, 0.45);
+
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 260ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --z-dropdown: 1000;
+  --z-overlay: 1100;
+  --z-modal: 1200;
+  --z-toast: 1300;
+
+  --bg: var(--surface-ground);
+  --panel: var(--surface-card);
+  --border: var(--surface-border);
+  --text: var(--text-color);
+  --text-muted: var(--text-color-secondary);
+  --accent: var(--primary);
 }
 
 * {
@@ -20,6 +70,151 @@ body,
 app-root {
   height: 100%;
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--surface-ground);
+  color: var(--text-color);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+code,
+kbd,
+samp,
+pre,
+.mono,
+.tabular-nums {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--primary-hover);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--surface-border-strong);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-color-muted);
+  background-clip: padding-box;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.p-component {
+  font-family: var(--font-sans);
+}
+
+.dense-table .p-datatable-table {
+  min-width: 100%;
+}
+
+.dense-table .p-datatable-thead > tr > th {
+  padding: 0.3rem 0.4rem;
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-color-secondary);
+  background: transparent;
+  border-color: var(--surface-border);
+}
+
+.dense-table .p-datatable-tbody > tr > td {
+  padding: 0.3rem 0.4rem;
+  font-size: 0.72rem;
+  border-color: var(--surface-border);
+}
+
+.dense-table .p-datatable-tbody > tr {
+  background: transparent;
+}
+
+.dense-table .p-datatable-tbody > tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--surface-elevated) 55%, transparent);
+}
+
+.dense-table .p-datatable-tbody > tr:hover {
+  background: var(--surface-hover);
+}
+
+.dense-table .p-tag {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.05rem 0.35rem;
+  line-height: 1.2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
