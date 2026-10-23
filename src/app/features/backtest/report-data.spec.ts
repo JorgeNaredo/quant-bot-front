@@ -135,12 +135,14 @@ describe('report-data', () => {
   it('aggregates KPIs per side and for the delta', () => {
     const kpis = comparativeKpis(buildComparativeRows(document('develop'), 'all'));
     expect(kpis.left.count).toBe(2);
-    expect(kpis.left.bestDsrId).toBe('alpha');
-    expect(kpis.left.bestDsr).toBe(1.2);
     expect(kpis.left.totalPnl).toBe(300);
     expect(kpis.left.trades).toBe(20);
+    expect(kpis.left.winner?.id).toBe('alpha');
+    expect(kpis.left.winner?.deflatedSharpe).toBe(1.2);
+    expect(kpis.left.winner?.delta.deflatedSharpe).toBe(-0.3);
     expect(kpis.right.count).toBe(2);
     expect(kpis.right.totalPnl).toBe(300);
+    expect(kpis.right.winner?.id).toBe('alpha');
     expect(kpis.delta.leftWinner?.id).toBe('alpha');
     expect(kpis.delta.rightWinner?.id).toBe('alpha');
     expect(kpis.delta.leftWinner?.delta.deflatedSharpe).toBe(-0.3);
@@ -149,6 +151,13 @@ describe('report-data', () => {
       { label: 'failed', count: 1 },
       { label: '—', count: 2 },
     ]);
+  });
+
+  it('exposes the winner own metrics instead of side averages', () => {
+    const kpis = comparativeKpis(buildComparativeRows(document('develop'), 'all'));
+    expect(kpis.left.winner?.expectancyR).toBe(0.2);
+    expect(kpis.left.winner?.returnPct).toBe(5);
+    expect(kpis.left.winner?.closedTrades).toBe(10);
   });
 
   it('ignores specs without data when picking the winner', () => {
@@ -167,8 +176,7 @@ describe('report-data', () => {
     };
     doc.walkForward = { strategies: [] };
     const kpis = comparativeKpis(buildComparativeRows(doc, 'all'));
-    expect(kpis.left.bestDsrId).toBeNull();
-    expect(kpis.left.bestDsr).toBeNull();
+    expect(kpis.left.winner).toBeNull();
     expect(kpis.delta.leftWinner).toBeNull();
     expect(kpis.delta.rightWinner).toBeNull();
   });

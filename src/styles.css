@@ -25,6 +25,10 @@
   --font-mono: "Fira Code", "JetBrains Mono", ui-monospace, SFMono-Regular,
     Menlo, Consolas, monospace;
 
+  --text-table: 0.85rem;
+  --text-table-head: 0.7rem;
+  --text-table-tag: 0.66rem;
+
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -174,7 +178,7 @@ a:hover {
 
 .dense-table .p-datatable-thead > tr > th {
   padding: 0.3rem 0.4rem;
-  font-size: 0.64rem;
+  font-size: var(--text-table-head);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -189,7 +193,7 @@ a:hover {
 
 .dense-table .p-datatable-tbody > tr > td {
   padding: 0.3rem 0.4rem;
-  font-size: 0.72rem;
+  font-size: var(--text-table);
   border-color: var(--surface-border);
 }
 
@@ -206,7 +210,7 @@ a:hover {
 }
 
 .dense-table .p-tag {
-  font-size: 0.6rem;
+  font-size: var(--text-table-tag);
   font-weight: 700;
   padding: 0.05rem 0.35rem;
   line-height: 1.2;

@@ -53,18 +53,20 @@ export interface ComparativeRow {
   reasons: string[];
 }
 
-export interface SideKpis {
-  count: number;
-  bestDsrId: string | null;
-  bestDsr: number | null;
-  avgExpectancyR: number | null;
-  totalPnl: number;
-  trades: number;
-}
-
 export interface WinnerKpi {
   id: string;
+  deflatedSharpe: number;
+  expectancyR?: number;
+  returnPct?: number;
+  closedTrades?: number;
   delta: ComparativeDelta;
+}
+
+export interface SideKpis {
+  count: number;
+  winner: WinnerKpi | null;
+  totalPnl: number;
+  trades: number;
 }
 
 export interface ComparativeKpis {
@@ -284,8 +286,6 @@ export function winnerOf(rows: ComparativeRow[], side: 'left' | 'right'): Compar
 }
 
 export function sideKpis(rows: ComparativeRow[], side: 'left' | 'right'): SideKpis {
-  let expectancySum = 0;
-  let expectancyCount = 0;
   let totalPnl = 0;
   let trades = 0;
   let count = 0;
@@ -295,19 +295,24 @@ export function sideKpis(rows: ComparativeRow[], side: 'left' | 'right'): SideKp
     count += 1;
     totalPnl += report.netPnl ?? 0;
     trades += report.closedTrades ?? 0;
-    if (report.expectancyR != null) {
-      expectancySum += report.expectancyR;
-      expectancyCount += 1;
-    }
   }
   const winner = winnerOf(rows, side);
+  const report = winner?.[side];
   return {
     count,
-    bestDsrId: winner?.id ?? null,
-    bestDsr: winner?.[side]?.deflatedSharpe ?? null,
-    avgExpectancyR: expectancyCount ? expectancySum / expectancyCount : null,
     totalPnl,
     trades,
+    winner:
+      winner && report
+        ? {
+            id: winner.id,
+            deflatedSharpe: report.deflatedSharpe ?? 0,
+            expectancyR: report.expectancyR,
+            returnPct: report.returnPct,
+            closedTrades: report.closedTrades,
+            delta: winner.delta,
+          }
+        : null,
   };
 }
 
@@ -350,14 +355,12 @@ export function comparativeKpis(rows: ComparativeRow[]): ComparativeKpis {
   const verdicts = Array.from(counts.entries())
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => verdictRank(a.label) - verdictRank(b.label) || b.count - a.count);
-  const leftWinner = winnerOf(rows, 'left');
-  const rightWinner = winnerOf(rows, 'right');
   return {
     left,
     right,
     delta: {
-      leftWinner: leftWinner ? { id: leftWinner.id, delta: leftWinner.delta } : null,
-      rightWinner: rightWinner ? { id: rightWinner.id, delta: rightWinner.delta } : null,
+      leftWinner: left.winner,
+      rightWinner: right.winner,
       verdicts,
     },
   };

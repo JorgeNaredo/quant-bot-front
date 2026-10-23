@@ -56,13 +56,13 @@
 
 .cmp__count {
   flex: none;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   color: var(--text-color-muted);
 }
 
 .cmp__hint {
   flex: none;
-  font-size: 0.64rem;
+  font-size: 0.7rem;
   color: var(--text-color-muted);
 }
 
@@ -74,7 +74,7 @@
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.72rem;
+  font-size: var(--text-table);
 }
 
 .cmp__col-name {
@@ -100,7 +100,7 @@
 
 .cmp__table thead th {
   padding: 0.3rem 0.45rem;
-  font-size: 0.6rem;
+  font-size: var(--text-table-head);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -155,7 +155,7 @@
 .cmp__motivos {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.66rem;
+  font-size: 0.78rem;
   color: var(--text-color-secondary);
 }
 
@@ -175,7 +175,7 @@
 }
 
 :host ::ng-deep .cmp__verdict .p-tag {
-  font-size: 0.58rem;
+  font-size: var(--text-table-tag);
   font-weight: 700;
   padding: 0.05rem 0.3rem;
   line-height: 1.2;
@@ -189,7 +189,7 @@ p-paginator {
   padding: 0;
   background: transparent;
   border: 0;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
 }
 
 @media (max-width: 860px) {

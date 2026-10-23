@@ -72,7 +72,7 @@
 }
 
 .kpi__cell dt {
-  font-size: 0.6rem;
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -91,7 +91,22 @@
 }
 
 .kpi__id {
-  font-size: 0.62rem;
+  font-size: 0.68rem;
+  color: var(--text-color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kpi__hint {
+  margin: 0;
+  font-size: 0.64rem;
+  color: var(--text-color-muted);
+}
+
+.kpi__foot {
+  margin: 0;
+  font-size: 0.66rem;
   color: var(--text-color-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -114,7 +129,7 @@
 }
 
 .winners__row--head {
-  font-size: 0.58rem;
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -130,7 +145,7 @@
   align-items: baseline;
   gap: 0.35rem;
   min-width: 0;
-  font-size: 0.74rem;
+  font-size: 0.82rem;
   color: var(--text-color);
 }
 
@@ -140,7 +155,7 @@
 }
 
 .winners__id {
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   color: var(--text-color-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -149,7 +164,7 @@
 
 .winners__val {
   text-align: right;
-  font-size: 0.8rem;
+  font-size: 0.86rem;
   font-weight: 600;
   color: var(--text-color);
   white-space: nowrap;
@@ -167,7 +182,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   color: var(--text-color-secondary);
 }
 
@@ -184,7 +199,7 @@
 }
 
 :host ::ng-deep .kpi .p-tag {
-  font-size: 0.6rem;
+  font-size: 0.66rem;
   font-weight: 700;
   padding: 0.05rem 0.35rem;
   line-height: 1.2;
