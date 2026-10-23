@@ -13,12 +13,12 @@
         <tr>
           <th pSortableColumn="id">Estrategia <p-sortIcon field="id" /></th>
           <th>Al cierre</th>
-          <th pSortableColumn="winRatePct">Win% <p-sortIcon field="winRatePct" /></th>
-          <th pSortableColumn="winners">Ganadores <p-sortIcon field="winners" /></th>
-          <th pSortableColumn="avgWinR">R ganador <p-sortIcon field="avgWinR" /></th>
-          <th pSortableColumn="avgLossR">R perdedor <p-sortIcon field="avgLossR" /></th>
-          <th pSortableColumn="maxConsecutiveLosses">Racha <p-sortIcon field="maxConsecutiveLosses" /></th>
-          <th pSortableColumn="avgBarsInTrade">Velas <p-sortIcon field="avgBarsInTrade" /></th>
+          <th pSortableColumn="winRatePct" class="num">Win% <p-sortIcon field="winRatePct" /></th>
+          <th pSortableColumn="winners" class="num">Ganadores <p-sortIcon field="winners" /></th>
+          <th pSortableColumn="avgWinR" class="num">R ganador <p-sortIcon field="avgWinR" /></th>
+          <th pSortableColumn="avgLossR" class="num">R perdedor <p-sortIcon field="avgLossR" /></th>
+          <th pSortableColumn="maxConsecutiveLosses" class="num">Racha <p-sortIcon field="maxConsecutiveLosses" /></th>
+          <th pSortableColumn="avgBarsInTrade" class="num">Velas <p-sortIcon field="avgBarsInTrade" /></th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-row>
@@ -54,10 +54,10 @@
       <ng-template pTemplate="header">
         <tr>
           <th>Estrategia</th>
-          <th>Liquidación</th>
-          <th>Stop</th>
-          <th>Target</th>
-          <th>Signal</th>
+          <th class="num">Liquidación</th>
+          <th class="num">Stop</th>
+          <th class="num">Target</th>
+          <th class="num">Signal</th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-row>
@@ -90,11 +90,11 @@
       <ng-template pTemplate="header">
         <tr>
           <th pSortableColumn="id">Estrategia <p-sortIcon field="id" /></th>
-          <th pSortableColumn="maxDrawdownBars">DD velas <p-sortIcon field="maxDrawdownBars" /></th>
-          <th pSortableColumn="exposurePct">Exposición % <p-sortIcon field="exposurePct" /></th>
-          <th pSortableColumn="sharpePerBar">Sharpe/vela <p-sortIcon field="sharpePerBar" /></th>
-          <th pSortableColumn="sharpeAnnualized">Sharpe anual <p-sortIcon field="sharpeAnnualized" /></th>
-          <th pSortableColumn="probabilisticSharpe">PSR <p-sortIcon field="probabilisticSharpe" /></th>
+          <th pSortableColumn="maxDrawdownBars" class="num">DD velas <p-sortIcon field="maxDrawdownBars" /></th>
+          <th pSortableColumn="exposurePct" class="num">Exposición % <p-sortIcon field="exposurePct" /></th>
+          <th pSortableColumn="sharpePerBar" class="num">Sharpe/vela <p-sortIcon field="sharpePerBar" /></th>
+          <th pSortableColumn="sharpeAnnualized" class="num">Sharpe anual <p-sortIcon field="sharpeAnnualized" /></th>
+          <th pSortableColumn="probabilisticSharpe" class="num">PSR <p-sortIcon field="probabilisticSharpe" /></th>
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-row>

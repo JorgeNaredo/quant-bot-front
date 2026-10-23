@@ -223,12 +223,12 @@ export function buildMonthlyTable(
 ): ReportTable {
   const confirm = evaluationModeOf(doc) === 'confirm';
   return {
-    headers: confirm ? ['mes', 'holdout'] : ['mes', 'IS', 'OOS'],
-    rows: buildMonthlyBars(doc, strategyId).map((bar) =>
-      confirm
-        ? [bar.month, formatNumber(bar.oos, 2)]
-        : [bar.month, formatNumber(bar.is, 2), formatNumber(bar.oos, 2)],
-    ),
+    headers: confirm ? ['mes', 'OOS', 'Holdout'] : ['mes', 'IS', 'OOS'],
+    rows: buildMonthlyBars(doc, strategyId).map((bar) => [
+      bar.month,
+      formatNumber(bar.left, 2),
+      formatNumber(bar.right, 2),
+    ]),
   };
 }
 

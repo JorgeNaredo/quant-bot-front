@@ -1,0 +1,116 @@
+<section class="kpis" aria-label="Resumen comparativo">
+  <article class="kpi">
+    <header class="kpi__head">
+      <h3>{{ sides().leftFullLabel }}</h3>
+      <span class="kpi__count mono">{{ kpis().left.count }}</span>
+    </header>
+    <dl class="kpi__grid">
+      <div class="kpi__cell">
+        <dt>Mejor DSR</dt>
+        <dd class="kpi__value mono">{{ num(kpis().left.bestDsr, 2) }}</dd>
+        @if (kpis().left.bestDsrId; as id) {
+          <span class="kpi__id mono" [title]="id">{{ id }}</span>
+        }
+      </div>
+      <div class="kpi__cell">
+        <dt>E[R] medio</dt>
+        <dd class="kpi__value mono">{{ num(kpis().left.avgExpectancyR, 3) }}</dd>
+      </div>
+      <div class="kpi__cell">
+        <dt>PnL</dt>
+        <dd
+          class="kpi__value mono"
+          [class.pos]="kpis().left.totalPnl > 0"
+          [class.neg]="kpis().left.totalPnl < 0">
+          {{ num(kpis().left.totalPnl, 2) }}
+        </dd>
+      </div>
+      <div class="kpi__cell">
+        <dt>Trades</dt>
+        <dd class="kpi__value mono">{{ num(kpis().left.trades, 0) }}</dd>
+      </div>
+    </dl>
+  </article>
+
+  <article class="kpi">
+    <header class="kpi__head">
+      <h3>{{ sides().rightFullLabel }}</h3>
+      <span class="kpi__count mono">{{ kpis().right.count }}</span>
+    </header>
+    <dl class="kpi__grid">
+      <div class="kpi__cell">
+        <dt>Mejor DSR</dt>
+        <dd class="kpi__value mono">{{ num(kpis().right.bestDsr, 2) }}</dd>
+        @if (kpis().right.bestDsrId; as id) {
+          <span class="kpi__id mono" [title]="id">{{ id }}</span>
+        }
+      </div>
+      <div class="kpi__cell">
+        <dt>E[R] medio</dt>
+        <dd class="kpi__value mono">{{ num(kpis().right.avgExpectancyR, 3) }}</dd>
+      </div>
+      <div class="kpi__cell">
+        <dt>PnL</dt>
+        <dd
+          class="kpi__value mono"
+          [class.pos]="kpis().right.totalPnl > 0"
+          [class.neg]="kpis().right.totalPnl < 0">
+          {{ num(kpis().right.totalPnl, 2) }}
+        </dd>
+      </div>
+      <div class="kpi__cell">
+        <dt>Trades</dt>
+        <dd class="kpi__value mono">{{ num(kpis().right.trades, 0) }}</dd>
+      </div>
+    </dl>
+  </article>
+
+  <article class="kpi kpi--delta">
+    <header class="kpi__head">
+      <h3>{{ sides().deltaLabel }}</h3>
+    </header>
+    <div class="winners">
+      <div class="winners__row winners__row--head">
+        <span>Ganadora</span>
+        <span>ΔDSR</span>
+        <span>ΔE[R]</span>
+        <span>ΔRet%</span>
+      </div>
+      @for (row of winnerRows(); track row.key) {
+        <div class="winners__row">
+          <span class="winners__who">
+            <span class="winners__label">{{ row.label }}</span>
+            <span class="winners__id mono" [title]="row.id">{{ row.id }}</span>
+          </span>
+          <span
+            class="winners__val mono"
+            [class.down]="tone(row.delta.deflatedSharpe) === 'down'">
+            {{ delta(row.delta.deflatedSharpe, 2) }}
+          </span>
+          <span
+            class="winners__val mono"
+            [class.down]="tone(row.delta.expectancyR) === 'down'">
+            {{ delta(row.delta.expectancyR, 3) }}
+          </span>
+          <span class="winners__val mono" [class.down]="tone(row.delta.returnPct) === 'down'">
+            {{ delta(row.delta.returnPct, 1) }}
+          </span>
+        </div>
+      } @empty {
+        <div class="winners__row">
+          <span class="winners__label">Sin datos</span>
+        </div>
+      }
+    </div>
+    <div class="kpi__verdicts">
+      @for (verdict of kpis().delta.verdicts; track verdict.label) {
+        <span class="kpi__verdict">
+          <p-tag [value]="verdict.label" [severity]="severity(verdict.label)" />
+          <span class="mono">{{ verdict.count }}</span>
+        </span>
+      } @empty {
+        <span class="kpi__value mono">—</span>
+      }
+    </div>
+  </article>
+</section>

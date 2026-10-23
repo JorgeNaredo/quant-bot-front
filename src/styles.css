@@ -183,6 +183,10 @@ a:hover {
   border-color: var(--surface-border);
 }
 
+.dense-table .p-datatable-thead > tr > th.num {
+  text-align: right;
+}
+
 .dense-table .p-datatable-tbody > tr > td {
   padding: 0.3rem 0.4rem;
   font-size: 0.72rem;

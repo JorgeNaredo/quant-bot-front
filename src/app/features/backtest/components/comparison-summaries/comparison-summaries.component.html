@@ -1,0 +1,162 @@
+<section class="cmp" aria-label="Comparación de splits por estrategia">
+  <div class="cmp__grid">
+    <article class="cmp__panel">
+      <header class="cmp__head">
+        <h3>{{ sides().leftFullLabel }}</h3>
+        <span class="cmp__count mono">{{ visible().length }} / {{ rows().length }}</span>
+      </header>
+      <div class="cmp__scroll">
+        <table class="cmp__table">
+          <caption class="sr-only">{{ sides().leftFullLabel }} por estrategia</caption>
+          <colgroup>
+            <col class="cmp__col-name" />
+            <col span="4" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Estrategia</th>
+              <th scope="col" class="num">DSR</th>
+              <th scope="col" class="num">E[R]</th>
+              <th scope="col" class="num">PF</th>
+              <th scope="col" class="num">Ret%</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of visible(); track row.id) {
+              <tr [class.cmp__row--missing]="!row.left">
+                <th scope="row" class="cmp__name mono" [title]="row.id">{{ row.id }}</th>
+                <td class="num">{{ num(row.left?.deflatedSharpe, 2) }}</td>
+                <td class="num">{{ num(row.left?.expectancyR, 3) }}</td>
+                <td class="num">{{ num(row.left?.profitFactor, 2) }}</td>
+                <td class="num">{{ num(row.left?.returnPct, 1) }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td class="cmp__empty" colspan="5">Sin estrategias</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="cmp__panel">
+      <header class="cmp__head">
+        <h3>{{ sides().rightFullLabel }}</h3>
+        <span class="cmp__count mono">{{ visible().length }} / {{ rows().length }}</span>
+      </header>
+      <div class="cmp__scroll">
+        <table class="cmp__table">
+          <caption class="sr-only">{{ sides().rightFullLabel }} por estrategia</caption>
+          <colgroup>
+            <col class="cmp__col-name" />
+            <col span="4" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th scope="col">Estrategia</th>
+              <th scope="col" class="num">DSR</th>
+              <th scope="col" class="num">E[R]</th>
+              <th scope="col" class="num">PF</th>
+              <th scope="col" class="num">Ret%</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of visible(); track row.id) {
+              <tr [class.cmp__row--missing]="!row.right">
+                <th scope="row" class="cmp__name mono" [title]="row.id">{{ row.id }}</th>
+                <td class="num">{{ num(row.right?.deflatedSharpe, 2) }}</td>
+                <td class="num">{{ num(row.right?.expectancyR, 3) }}</td>
+                <td class="num">{{ num(row.right?.profitFactor, 2) }}</td>
+                <td class="num">{{ num(row.right?.returnPct, 1) }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td class="cmp__empty" colspan="5">Sin estrategias</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </div>
+
+  <article class="cmp__panel cmp__panel--delta">
+    <header class="cmp__head">
+      <h3>{{ sides().deltaLabel }}</h3>
+      <span class="cmp__hint">Deltas respecto de {{ sides().leftLabel }}</span>
+    </header>
+    <div class="cmp__scroll">
+      <table class="cmp__table cmp__table--delta">
+        <caption class="sr-only">{{ sides().deltaLabel }} por estrategia</caption>
+        <colgroup>
+          <col class="cmp__col-name" />
+          <col span="4" />
+          <col class="cmp__col-verdict" />
+          <col class="cmp__col-reasons" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col">Estrategia</th>
+            <th scope="col" class="num">ΔDSR</th>
+            <th scope="col" class="num">ΔE[R]</th>
+            <th scope="col" class="num">ΔPF</th>
+            <th scope="col" class="num">ΔRet%</th>
+            <th scope="col">Veredicto</th>
+            <th scope="col">Motivos</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of visible(); track row.id) {
+            <tr>
+              <th scope="row" class="cmp__name mono" [title]="row.id">{{ row.id }}</th>
+              <td
+                class="num"
+                [class.up]="isUp(row.delta.deflatedSharpe)"
+                [class.down]="isDown(row.delta.deflatedSharpe)">
+                {{ delta(row.delta.deflatedSharpe, 2) }}
+              </td>
+              <td
+                class="num"
+                [class.up]="isUp(row.delta.expectancyR)"
+                [class.down]="isDown(row.delta.expectancyR)">
+                {{ delta(row.delta.expectancyR, 3) }}
+              </td>
+              <td
+                class="num"
+                [class.up]="isUp(row.delta.profitFactor)"
+                [class.down]="isDown(row.delta.profitFactor)">
+                {{ delta(row.delta.profitFactor, 2) }}
+              </td>
+              <td
+                class="num"
+                [class.up]="isUp(row.delta.returnPct)"
+                [class.down]="isDown(row.delta.returnPct)">
+                {{ delta(row.delta.returnPct, 1) }}
+              </td>
+              <td class="cmp__verdict">
+                <p-tag [value]="row.label" [severity]="severity(row.label)" />
+              </td>
+              <td class="cmp__motivos" [title]="reasonsText(row)">
+                {{ reasonsText(row) }}
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td class="cmp__empty" colspan="7">Sin comparación</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  @if (rows().length > pageSizes[0]) {
+    <p-paginator
+      [first]="first()"
+      [rows]="pageSize()"
+      [totalRecords]="rows().length"
+      [rowsPerPageOptions]="pageSizes"
+      (onPageChange)="onPage($event)" />
+  }
+</section>

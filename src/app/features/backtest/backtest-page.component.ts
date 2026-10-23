@@ -4,8 +4,10 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  Injector,
   OnDestroy,
   ViewChild,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -16,33 +18,40 @@ import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
 import { AccordionModule } from 'primeng/accordion';
 import { ButtonModule } from 'primeng/button';
 import { MessageModule } from 'primeng/message';
+import { SelectButtonModule } from 'primeng/selectbutton';
 import { TableModule } from 'primeng/table';
+import { TabsModule } from 'primeng/tabs';
 import { TagModule } from 'primeng/tag';
 import {
   EvaluationDocument,
   ReportEntry,
   SpecReachabilityOutcome,
-  StrategyReport,
   SymbolOutcome,
-  TradeRow,
 } from '../../shared/models/bot-api.model';
 import { BotApiService } from '../../shared/services/bot-api.service';
 import { SessionStoreService } from '../../shared/services/session-store.service';
 import {
+  ComparativeSort,
   MonthlyBar,
   SplitKey,
-  buildComparisonRows,
+  buildComparativeRows,
   buildMonthlyBars,
   collectTrades,
-  evaluationModeOf,
+  comparativeKpis,
+  comparisonSides,
   filterByStrategy,
   formatRunHeader,
+  sortComparativeRows,
+  splitStrategies,
   strategyOptions,
 } from './report-data';
 import { ReportExportComponent } from './report-export/report-export.component';
-import { ResultComparisonTableComponent } from './components/result-comparison-table/result-comparison-table.component';
+import { ComparisonSummariesComponent } from './components/comparison-summaries/comparison-summaries.component';
+import { ComparativeKpisComponent } from './components/comparative-kpis/comparative-kpis.component';
 import { StrategyDetailsComponent } from './components/strategy-details/strategy-details.component';
 import { StrategySummaryTableComponent } from './components/strategy-summary-table/strategy-summary-table.component';
+
+type DetailTab = 'strategies' | 'trades' | 'stages' | 'curves';
 
 @Component({
   selector: 'app-backtest-page',
@@ -54,11 +63,14 @@ import { StrategySummaryTableComponent } from './components/strategy-summary-tab
     AccordionModule,
     ButtonModule,
     MessageModule,
+    SelectButtonModule,
     TableModule,
+    TabsModule,
     TagModule,
     StrategySummaryTableComponent,
     StrategyDetailsComponent,
-    ResultComparisonTableComponent,
+    ComparisonSummariesComponent,
+    ComparativeKpisComponent,
   ],
   templateUrl: './backtest-page.component.html',
   styleUrl: './backtest-page.component.css',
@@ -71,6 +83,7 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   private readonly api = inject(BotApiService);
   private readonly store = inject(SessionStoreService);
   private readonly router = inject(Router);
+  private readonly injector = inject(Injector);
 
   protected readonly session = this.store.connect;
   protected readonly evaluation = signal<EvaluationDocument | null>(null);
@@ -83,43 +96,60 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
   protected readonly profileOutcome = signal<SymbolOutcome | null>(null);
   protected readonly reachabilityOutcome = signal<SpecReachabilityOutcome | null>(null);
   protected readonly selectedStrategy = signal<string>('all');
-  /** Filtro del gráfico mensual: sigue al general, pero puede desviarse solo. */
-  protected readonly chartStrategy = signal<string>('all');
-  /** Filtro de trades individuales: mismo patrón que chartStrategy. */
-  protected readonly tradesStrategy = signal<string>('all');
-  protected readonly tradeSplit = signal<SplitKey>('train');
+  protected readonly comparativeSort = signal<ComparativeSort>('verdict');
+  protected readonly detailSplit = signal<SplitKey>('train');
+  protected readonly activeTab = signal<DetailTab>('strategies');
   protected readonly exportOpen = signal(false);
-  protected readonly confirmMode = computed(() => evaluationModeOf(this.evaluation()) === 'confirm');
+
+  protected readonly sides = computed(() => comparisonSides(this.evaluation()));
+  protected readonly confirmMode = computed(() => this.sides().mode === 'confirm');
 
   protected readonly strategyIds = computed(() => {
     const doc = this.evaluation();
     return doc ? strategyOptions(doc) : ['all'];
   });
 
-  protected readonly comparisonRows = computed(() => {
+  protected readonly comparativeRows = computed(() => {
     const doc = this.evaluation();
     if (!doc) return [];
-    return buildComparisonRows(doc, this.selectedStrategy());
+    return sortComparativeRows(
+      buildComparativeRows(doc, this.selectedStrategy()),
+      this.comparativeSort(),
+    );
+  });
+
+  protected readonly kpis = computed(() => {
+    const doc = this.evaluation();
+    return comparativeKpis(doc ? buildComparativeRows(doc, this.selectedStrategy()) : []);
+  });
+
+  protected readonly splitOptions = computed(() => {
+    const sides = this.sides();
+    return [
+      { label: sides.leftLabel, value: sides.left },
+      { label: sides.rightLabel, value: sides.right },
+    ];
+  });
+
+  protected readonly detailStrategyRows = computed(() => {
+    const doc = this.evaluation();
+    if (!doc) return [];
+    return filterByStrategy(splitStrategies(doc, this.detailSplit()), this.selectedStrategy());
+  });
+
+  protected readonly tradeRows = computed(() => {
+    const doc = this.evaluation();
+    return doc ? collectTrades(doc, this.detailSplit(), this.selectedStrategy()) : [];
   });
 
   protected readonly monthly = computed<MonthlyBar[]>(() => {
     const doc = this.evaluation();
-    return doc ? buildMonthlyBars(doc, this.chartStrategy()) : [];
+    return doc ? buildMonthlyBars(doc, this.selectedStrategy()) : [];
   });
 
-  protected readonly verdictReasons = computed(() =>
-    this.comparisonRows().filter((row) => row.reasons.length > 0),
-  );
-
-  protected readonly trainRows = computed(() => this.filteredStrategies('train'));
-  protected readonly walkForwardRows = computed(() => this.filteredStrategies('walkForward'));
-  protected readonly holdoutRows = computed(() => this.filteredStrategies('holdout'));
-  protected readonly stageRows = computed(() => this.filteredStrategies(this.tradeSplit()));
-  protected readonly tradeRows = computed(() => this.trades(this.tradeSplit()));
-
   private chart: IChartApi | null = null;
-  private isSeries: ISeriesApi<'Histogram'> | null = null;
-  private oosSeries: ISeriesApi<'Histogram'> | null = null;
+  private leftSeries: ISeriesApi<'Histogram'> | null = null;
+  private rightSeries: ISeriesApi<'Histogram'> | null = null;
 
   ngAfterViewInit(): void {
     if (!this.session()) {
@@ -152,12 +182,11 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     this.api.start(mode).subscribe({
       next: (response) => {
         this.busy.set(false);
-        if (!response.ok) {
+        if (!response.ok || !response.evaluation) {
           this.error.set(response.error || 'Falló el backtest');
           return;
         }
-        this.evaluation.set(response.evaluation);
-        this.tradeSplit.set(mode === 'confirm' ? 'holdout' : 'train');
+        this.applyEvaluation(response.evaluation);
         this.refreshChart();
         this.refreshReportList(true);
       },
@@ -176,8 +205,7 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     this.api.getReport(name).subscribe({
       next: (doc) => {
         this.busy.set(false);
-        this.evaluation.set(doc);
-        this.tradeSplit.set(evaluationModeOf(doc) === 'confirm' ? 'holdout' : 'train');
+        this.applyEvaluation(doc);
         this.refreshChart();
       },
       error: (err) => {
@@ -230,18 +258,14 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
 
   protected onStrategyChange(id: string): void {
     this.selectedStrategy.set(id);
-    this.chartStrategy.set(id);
-    this.tradesStrategy.set(id);
     this.refreshChart();
   }
 
-  protected onChartStrategyChange(id: string): void {
-    this.chartStrategy.set(id);
-    this.refreshChart();
-  }
-
-  protected onTradesStrategyChange(id: string): void {
-    this.tradesStrategy.set(id);
+  protected onTabChange(tab: string | number | undefined): void {
+    this.activeTab.set((tab ?? 'strategies') as DetailTab);
+    if (tab === 'curves') {
+      afterNextRender(() => this.refreshChart(), { injector: this.injector });
+    }
   }
 
   protected openExport(): void {
@@ -250,25 +274,13 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  protected strategies(split: SplitKey): StrategyReport[] {
-    return this.evaluation()?.[split]?.strategies ?? [];
-  }
-
-  /** Filas de un split respetando el filtro de estrategia. */
-  protected filteredStrategies(split: SplitKey): StrategyReport[] {
-    return filterByStrategy(this.strategies(split), this.selectedStrategy());
-  }
-
-  protected runMeta(split: SplitKey): string {
-    const label =
-      split === 'train' ? 'train' : split === 'walkForward' ? 'walk-forward' : 'holdout';
-    return formatRunHeader(label, this.evaluation()?.[split]?.run);
-  }
-
-  protected trades(split: SplitKey): TradeRow[] {
+  protected runMeta(side: 'left' | 'right'): string {
     const doc = this.evaluation();
-    if (!doc) return [];
-    return collectTrades(doc, split, this.tradesStrategy());
+    if (!doc) return '';
+    const sides = this.sides();
+    const split = side === 'left' ? sides.left : sides.right;
+    const label = side === 'left' ? sides.leftLabel : sides.rightLabel;
+    return formatRunHeader(label, doc[split]?.run);
   }
 
   protected tradeSideSeverity(side: string | undefined): 'success' | 'danger' | 'secondary' {
@@ -294,6 +306,12 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  private applyEvaluation(doc: EvaluationDocument): void {
+    this.evaluation.set(doc);
+    this.selectedStrategy.set('all');
+    this.detailSplit.set(comparisonSides(doc).left);
+  }
+
   private refreshReportList(selectNewest = false): void {
     this.api.listReports().subscribe({
       next: (entries) => {
@@ -305,7 +323,6 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
           const name = entries[0].name;
           this.selectedReport.set(name);
           if (!this.evaluation() || selectNewest) {
-            // After a run, evaluation already comes from start; only fetch on first paint.
             if (!selectNewest) {
               this.onReportChange(name);
             }
@@ -322,36 +339,41 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     setTimeout(() => {
       const host = this.monthChartEl?.nativeElement;
       if (!host) return;
+      const width = host.clientWidth;
+      const bars = this.monthly();
       if (!this.chart) {
+        if (!width) return;
         this.chart = createChart(host, {
+          width,
           height: 260,
           layout: { background: { color: '#111827' }, textColor: '#94a3b8' },
           grid: { vertLines: { color: '#1e2940' }, horzLines: { color: '#1e2940' } },
           rightPriceScale: { borderColor: '#263145' },
           timeScale: { borderColor: '#263145' },
         });
-        this.isSeries = this.chart.addHistogramSeries({
+        this.leftSeries = this.chart.addHistogramSeries({
           color: '#4c8dff',
           priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
         });
-        this.oosSeries = this.chart.addHistogramSeries({
+        this.rightSeries = this.chart.addHistogramSeries({
           color: '#22c55e',
           priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
         });
       }
-      const bars = this.monthly();
-      const isMapped = bars.map((b) => ({
-        time: monthToUtc(b.month),
-        value: b.is,
-        color: b.is >= 0 ? '#4c8dff' : '#365fa8',
+      if (!width) return;
+      this.chart.resize(width, 260);
+      const leftMapped = bars.map((bar) => ({
+        time: monthToUtc(bar.month),
+        value: bar.left,
+        color: bar.left >= 0 ? '#4c8dff' : '#365fa8',
       }));
-      const oosMapped = bars.map((b) => ({
-        time: monthToUtc(b.month),
-        value: b.oos,
-        color: b.oos >= 0 ? '#22c55e' : '#3f7a55',
+      const rightMapped = bars.map((bar) => ({
+        time: monthToUtc(bar.month),
+        value: bar.right,
+        color: bar.right >= 0 ? '#22c55e' : '#3f7a55',
       }));
-      this.isSeries?.setData(isMapped as never);
-      this.oosSeries?.setData(oosMapped as never);
+      this.leftSeries?.setData(leftMapped as never);
+      this.rightSeries?.setData(rightMapped as never);
       this.chart.timeScale().fitContent();
     }, 0);
   }

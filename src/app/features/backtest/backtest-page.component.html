@@ -1,15 +1,66 @@
 <div class="bt">
   <header class="bt__header">
-    <div class="bt__heading">
-      <h1>Backtest</h1>
-      @if (session(); as s) {
-        <p class="bt__meta">{{ s.symbol }} · {{ s.interval }} · {{ s.state }}</p>
-      }
+    <div class="bt__title-row">
+      <div class="bt__heading">
+        <h1>Backtest</h1>
+        <p class="bt__meta">
+          @if (session(); as s) {
+            <span class="mono">{{ s.symbol }} · {{ s.interval }}</span> · {{ s.state }}
+          }
+          @if (selectedReport()) {
+            · <span class="mono">{{ selectedReport() }}</span>
+          }
+        </p>
+      </div>
+
+      <div class="bt__actions">
+        <p-button
+          icon="pi pi-download"
+          label="Exportar"
+          size="small"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="!evaluation() || busy()"
+          (onClick)="openExport()" />
+        <p-button
+          icon="pi pi-check-circle"
+          label="Validar specs"
+          size="small"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="busy() || profiling() || checkingReachability()"
+          [loading]="checkingReachability()"
+          (onClick)="checkReachability()" />
+        <p-button
+          icon="pi pi-database"
+          label="Perfilar catálogo"
+          size="small"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="busy() || profiling() || checkingReachability()"
+          [loading]="profiling()"
+          (onClick)="profileCatalog()" />
+        <p-button
+          icon="pi pi-shield"
+          label="Confirmar holdout"
+          size="small"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="busy() || profiling() || checkingReachability()"
+          (onClick)="confirmHoldout()" />
+        <p-button
+          icon="pi pi-play"
+          label="Lanzar evaluación"
+          size="small"
+          [disabled]="busy() || profiling() || checkingReachability()"
+          [loading]="busy()"
+          (onClick)="run()" />
+      </div>
     </div>
 
-    <div class="bt__actions">
-      <label class="bt__select">
-        Informe
+    <div class="bt__context">
+      <label class="bt__field">
+        <span>Informe</span>
         <select
           [ngModel]="selectedReport()"
           (ngModelChange)="onReportChange($event)"
@@ -23,37 +74,30 @@
         </select>
       </label>
 
-      <p-button
-        label="Exportar"
-        severity="secondary"
-        [outlined]="true"
-        [disabled]="!evaluation() || busy()"
-        (onClick)="openExport()" />
-      <p-button
-        label="Validar specs"
-        severity="secondary"
-        [outlined]="true"
-        [disabled]="busy() || profiling() || checkingReachability()"
-        [loading]="checkingReachability()"
-        (onClick)="checkReachability()" />
-      <p-button
-        label="Lanzar evaluación"
-        [disabled]="busy() || profiling() || checkingReachability()"
-        [loading]="busy()"
-        (onClick)="run()" />
-      <p-button
-        label="Confirmar holdout"
-        severity="secondary"
-        [outlined]="true"
-        [disabled]="busy() || profiling() || checkingReachability()"
-        (onClick)="confirmHoldout()" />
-      <p-button
-        label="Perfilar catálogo"
-        severity="secondary"
-        [outlined]="true"
-        [disabled]="busy() || profiling() || checkingReachability()"
-        [loading]="profiling()"
-        (onClick)="profileCatalog()" />
+      <label class="bt__field">
+        <span>Estrategia</span>
+        <select [ngModel]="selectedStrategy()" (ngModelChange)="onStrategyChange($event)">
+          @for (id of strategyIds(); track id) {
+            <option [value]="id">{{ id === 'all' ? 'todas' : id }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="bt__field">
+        <span>Orden</span>
+        <select [ngModel]="comparativeSort()" (ngModelChange)="comparativeSort.set($event)">
+          <option value="verdict">Veredicto</option>
+          <option value="rightDsr">DSR {{ sides().rightLabel }}</option>
+          <option value="deltaDsr">ΔDSR</option>
+          <option value="id">Nombre</option>
+        </select>
+      </label>
+
+      @if (evaluation()) {
+        <p-tag
+          [value]="confirmMode() ? 'Confirmación holdout' : 'Desarrollo IS/OOS'"
+          [severity]="confirmMode() ? 'warn' : 'info'" />
+      }
     </div>
   </header>
 
@@ -62,304 +106,242 @@
   }
 
   @if (reachabilityOutcome(); as reach) {
-    <section class="bt__section">
-      <div class="bt__section-head">
+    <section class="bt__notice">
+      <header class="bt__notice-head">
         <h2>Alcanzabilidad de specs</h2>
-        <span class="bt__count mono">{{ reach.symbol }}</span>
-      </div>
-      @if (!reach.ok) {
-        <p-message severity="error" [text]="reach.error || 'Falló la validación'" />
-      } @else if (reach.report; as report) {
-        <p class="bt__meta">{{ report.barCount }} barras · {{ report.firstBar }} → {{ report.lastBar }}</p>
-        @if (report.unreachable.length === 0) {
-          <p-message severity="success" text="Todas las specs son alcanzables en este dataset." />
-        } @else {
-          <p-message
-            severity="warn"
-            [text]="report.unreachable.length + ' spec(s) semánticamente válidas pero no alcanzables: alguna stage de entry nunca se cumple.'" />
-          <p-table
-            [value]="report.unreachable"
-            styleClass="dense-table"
-            size="small"
-            stripedRows>
-            <ng-template pTemplate="header">
-              <tr>
-                <th class="num">#</th>
-                <th>Spec</th>
-                <th>Estado</th>
-              </tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-id let-rowIndex="rowIndex">
-              <tr>
-                <td class="num">{{ rowIndex + 1 }}</td>
-                <td class="mono">{{ id }}</td>
-                <td><p-tag value="unreachable" severity="warn" /></td>
-              </tr>
-            </ng-template>
-          </p-table>
+        <span class="bt__notice-meta mono">{{ reach.symbol }}</span>
+        <p-button
+          icon="pi pi-times"
+          size="small"
+          severity="secondary"
+          [text]="true"
+          ariaLabel="Cerrar resultado de alcanzabilidad"
+          (onClick)="reachabilityOutcome.set(null)" />
+      </header>
+      <div class="bt__notice-body">
+        @if (!reach.ok) {
+          <p-message severity="error" [text]="reach.error || 'Falló la validación'" />
+        } @else if (reach.report; as report) {
+          <p class="bt__meta mono">{{ report.barCount }} barras · {{ report.firstBar }} → {{ report.lastBar }}</p>
+          @if (report.unreachable.length === 0) {
+            <p-message severity="success" text="Todas las specs son alcanzables en este dataset." />
+          } @else {
+            <p-message
+              severity="warn"
+              [text]="report.unreachable.length + ' spec(s) semánticamente válidas pero no alcanzables: alguna stage de entry nunca se cumple.'" />
+            <ul class="bt__chips">
+              @for (id of report.unreachable; track id) {
+                <li class="bt__chip mono">{{ id }}</li>
+              }
+            </ul>
+          }
         }
-      }
+      </div>
     </section>
   }
 
   @if (profileOutcome(); as outcome) {
-    <section class="bt__section">
-      <div class="bt__section-head">
+    <section class="bt__notice">
+      <header class="bt__notice-head">
         <h2>Perfil de catálogo</h2>
-        <span class="bt__count mono">{{ outcome.symbol }}</span>
-      </div>
-      @if (!outcome.ok) {
-        <p-message severity="error" [text]="outcome.error || 'Falló el perfil'" />
-      } @else if (outcome.summary; as summary) {
-        <div class="profile">
-          <p>ready {{ summary.ready }} · skipped {{ summary.skipped }} · ready% {{ summary.readyPct | number:'1.1-1' }}</p>
-          <p>features {{ summary.features }} · measured {{ summary.measured }} · max hole {{ summary.maxHoleBars }}</p>
-          <p class="bt__meta">{{ summary.dataDir }}</p>
+        <span class="bt__notice-meta mono">{{ outcome.symbol }}</span>
+        <p-button
+          icon="pi pi-times"
+          size="small"
+          severity="secondary"
+          [text]="true"
+          ariaLabel="Cerrar resultado del perfil de catálogo"
+          (onClick)="profileOutcome.set(null)" />
+      </header>
+      <div class="bt__notice-body">
+        @if (!outcome.ok) {
+          <p-message severity="error" [text]="outcome.error || 'Falló el perfil'" />
+        } @else if (outcome.summary; as summary) {
+          <p class="bt__meta mono">
+            ready {{ summary.ready }} · skipped {{ summary.skipped }} · ready%
+            {{ summary.readyPct | number:'1.1-1' }} · features {{ summary.features }} · measured
+            {{ summary.measured }} · max hole {{ summary.maxHoleBars }}
+          </p>
+          <p class="bt__meta mono">{{ summary.dataDir }}</p>
           @if (summary.degenerate.length) {
-            <p>Degenerados: {{ summary.degenerate.join(', ') }}</p>
-          } @else {
-            <p>Sin features degeneradas</p>
+            <p class="bt__meta">Degenerados: {{ summary.degenerate.join(', ') }}</p>
           }
-        </div>
-      }
+        }
+      </div>
     </section>
   }
 
-  @if (evaluation(); as doc) {
-    <div class="bt__filter">
-      <label class="bt__select">
-        Filtrar por estrategia
-        <select [ngModel]="selectedStrategy()" (ngModelChange)="onStrategyChange($event)">
-          @for (id of strategyIds(); track id) {
-            <option [value]="id">{{ id === 'all' ? 'todas' : id }}</option>
-          }
-        </select>
-      </label>
-    </div>
-
-    @if (!confirmMode()) {
-      <section class="bt__section">
-        <div class="bt__section-head">
-          <h2>Train</h2>
-          <span class="bt__count mono">{{ trainRows().length }}</span>
-        </div>
-        <p class="bt__meta bt__run mono">{{ runMeta('train') }}</p>
-        <app-strategy-summary-table [rows]="trainRows()" />
-
-        <p-accordion [multiple]="true" styleClass="bt-accordion">
-          <p-accordion-panel value="detail">
-            <p-accordion-header>Detalle · Trades / Salidas / Curva</p-accordion-header>
-            <p-accordion-content>
-              <app-strategy-details [rows]="trainRows()" />
-            </p-accordion-content>
-          </p-accordion-panel>
-        </p-accordion>
-      </section>
-
-      <section class="bt__section">
-        <div class="bt__section-head">
-          <h2>Walk-forward</h2>
-          <span class="bt__count mono">{{ walkForwardRows().length }}</span>
-        </div>
-        <p class="bt__meta bt__run mono">{{ runMeta('walkForward') }}</p>
-        <app-strategy-summary-table [rows]="walkForwardRows()" />
-
-        <p-accordion [multiple]="true" styleClass="bt-accordion">
-          <p-accordion-panel value="detail">
-            <p-accordion-header>Detalle · Trades / Salidas / Curva</p-accordion-header>
-            <p-accordion-content>
-              <app-strategy-details [rows]="walkForwardRows()" />
-            </p-accordion-content>
-          </p-accordion-panel>
-        </p-accordion>
-      </section>
-    }
-
-    @if (confirmMode()) {
-      <section class="bt__section">
-        <div class="bt__section-head">
-          <h2>Holdout</h2>
-          <span class="bt__count mono">{{ holdoutRows().length }}</span>
-        </div>
-        <p class="bt__meta bt__run mono">{{ runMeta('holdout') }}</p>
-        <app-strategy-summary-table [rows]="holdoutRows()" />
-
-        <p-accordion [multiple]="true" styleClass="bt-accordion">
-          <p-accordion-panel value="detail">
-            <p-accordion-header>Detalle · Trades / Salidas / Curva</p-accordion-header>
-            <p-accordion-content>
-              <app-strategy-details [rows]="holdoutRows()" />
-            </p-accordion-content>
-          </p-accordion-panel>
-        </p-accordion>
-      </section>
-    }
-
-    <section class="bt__section">
-      <div class="bt__section-head">
-        <h2>Resultado</h2>
-        <span class="bt__count mono">{{ comparisonRows().length }}</span>
-      </div>
-      <app-result-comparison-table [rows]="comparisonRows()" [confirmMode]="confirmMode()" />
-
-      @if (verdictReasons(); as reasons) {
-        @if (reasons.length) {
-          <div class="bt__reasons">
-            <h3 class="bt__reasons-title">Motivos del veredicto</h3>
-            <p class="bt__reasons-hint">
-              @if (confirmMode()) {
-                Explica confirmed / failed / inconclusive (p. ej. muestra holdout insuficiente).
-              } @else {
-                Explica por qué el label no es candidate (p. ej. muestra OOS insuficiente).
-              }
-            </p>
-            <ul class="bt__reasons-list">
-              @for (row of reasons; track row.id) {
-                <li class="bt__reasons-item">
-                  <span class="bt__reasons-id mono">{{ row.id }}</span>
-                  <p-tag [value]="row.label" severity="warn" />
-                  <span class="bt__reasons-text">{{ row.reasons.join('; ') }}</span>
-                </li>
-              }
-            </ul>
-          </div>
-        }
-      }
+  @if (evaluation()) {
+    <section class="bt__summary" aria-label="Resumen comparativo del informe">
+      <app-comparative-kpis [kpis]="kpis()" [sides]="sides()" />
+      <app-comparison-summaries [rows]="comparativeRows()" [sides]="sides()" />
     </section>
 
-    <section class="bt__section">
-      <div class="bt__section-head">
-        <h2>{{ confirmMode() ? 'Ganancias por mes (holdout)' : 'Ganancias por mes (IS / OOS)' }}</h2>
-        <label class="bt__select">
-          Estrategia (gráfico)
-          <select [ngModel]="chartStrategy()" (ngModelChange)="onChartStrategyChange($event)">
-            @for (id of strategyIds(); track id) {
-              <option [value]="id">{{ id === 'all' ? 'todas' : id }}</option>
-            }
-          </select>
-        </label>
-      </div>
-      <div #monthChart class="bt__chart"></div>
-      @if (confirmMode()) {
-        <p class="bt__legend"><span class="swatch swatch--oos"></span> Holdout</p>
-      } @else {
-        <p class="bt__legend"><span class="swatch swatch--is"></span> IS (train) <span class="swatch swatch--oos"></span> OOS</p>
-      }
-    </section>
+    <section class="bt__detail">
+      <p-tabs class="bt-tabs" [value]="activeTab()" (valueChange)="onTabChange($event)">
+        <p-tablist>
+          <p-tab value="strategies"><i class="pi pi-table" aria-hidden="true"></i> Estrategias</p-tab>
+          <p-tab value="trades"><i class="pi pi-list" aria-hidden="true"></i> Trades</p-tab>
+          <p-tab value="stages"><i class="pi pi-sitemap" aria-hidden="true"></i> Stages</p-tab>
+          <p-tab value="curves"><i class="pi pi-chart-bar" aria-hidden="true"></i> Curvas</p-tab>
+        </p-tablist>
 
-    <section class="bt__section">
-      <div class="bt__section-head">
-        <h2>Stages</h2>
-        <div class="bt__tabs">
-          @if (confirmMode()) {
-            <p-button
-              label="Holdout"
-              size="small"
-              [outlined]="tradeSplit() !== 'holdout'"
-              (onClick)="tradeSplit.set('holdout')" />
-          } @else {
-            <p-button
-              label="Train"
-              size="small"
-              [outlined]="tradeSplit() !== 'train'"
-              (onClick)="tradeSplit.set('train')" />
-            <p-button
-              label="Walk-forward"
-              size="small"
-              [outlined]="tradeSplit() !== 'walkForward'"
-              (onClick)="tradeSplit.set('walkForward')" />
-          }
-        </div>
-      </div>
-
-      <p-accordion [multiple]="true" styleClass="bt-accordion">
-        @for (row of stageRows(); track row.id) {
-          <p-accordion-panel [value]="row.id">
-            <p-accordion-header>{{ row.id }}</p-accordion-header>
-            <p-accordion-content>
-              <div class="stages__grid">
-                <div>
-                  <h4>Long</h4>
-                  @for (st of row.stages?.long ?? []; track $index) {
-                    <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
-                  }
-                  <p>invalidated {{ row.stages?.invalidated?.long ?? 0 }}</p>
-                </div>
-                <div>
-                  <h4>Short</h4>
-                  @for (st of row.stages?.short ?? []; track $index) {
-                    <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
-                  }
-                  <p>invalidated {{ row.stages?.invalidated?.short ?? 0 }}</p>
-                </div>
+        <p-tabpanels>
+          <p-tabpanel value="strategies">
+            <div class="pane">
+              <div class="pane__bar">
+                <p-selectbutton
+                  size="small"
+                  [options]="splitOptions()"
+                  optionLabel="label"
+                  optionValue="value"
+                  [allowEmpty]="false"
+                  [ngModel]="detailSplit()"
+                  (ngModelChange)="detailSplit.set($event)" />
+                <span class="pane__hint">{{ detailStrategyRows().length }} estrategias</span>
               </div>
-            </p-accordion-content>
-          </p-accordion-panel>
-        } @empty {
-          <p class="empty">Sin stages</p>
-        }
-      </p-accordion>
-    </section>
 
-    <section class="bt__section">
-      <div class="bt__section-head">
-        <h2>Trades individuales ({{ tradeSplit() }})</h2>
-        <label class="bt__select">
-          Estrategia (trades)
-          <select [ngModel]="tradesStrategy()" (ngModelChange)="onTradesStrategyChange($event)">
-            @for (id of strategyIds(); track id) {
-              <option [value]="id">{{ id === 'all' ? 'todas' : id }}</option>
-            }
-          </select>
-        </label>
-      </div>
+              <app-strategy-summary-table [rows]="detailStrategyRows()" />
 
-      <p-table
-        [value]="tradeRows()"
-        styleClass="dense-table"
-        size="small"
-        stripedRows
-        [paginator]="tradeRows().length > 50"
-        [rows]="50"
-        [rowsPerPageOptions]="[50, 100, 250]"
-        [scrollable]="true"
-        [tableStyle]="{ 'min-width': '54rem' }">
-        <ng-template pTemplate="header">
-          <tr>
-            <th pSortableColumn="strategyId">Strat <p-sortIcon field="strategyId" /></th>
-            <th pSortableColumn="side">Side <p-sortIcon field="side" /></th>
-            <th pSortableColumn="entryTime">Entry <p-sortIcon field="entryTime" /></th>
-            <th pSortableColumn="exitTime">Exit <p-sortIcon field="exitTime" /></th>
-            <th pSortableColumn="netPnl">PnL <p-sortIcon field="netPnl" /></th>
-            <th pSortableColumn="netR">R <p-sortIcon field="netR" /></th>
-            <th>Reason</th>
-          </tr>
-        </ng-template>
-        <ng-template pTemplate="body" let-t>
-          <tr>
-            <td class="mono">{{ t.strategyId }}</td>
-            <td><p-tag [value]="t.side" [severity]="tradeSideSeverity(t.side)" /></td>
-            <td class="mono">{{ t.entryTime }}</td>
-            <td class="mono">{{ t.exitTime }}</td>
-            <td
-              class="num"
-              [class.pos]="(t.netPnl ?? 0) >= 0"
-              [class.neg]="(t.netPnl ?? 0) < 0">
-              {{ t.netPnl | number:'1.2-2' }}
-            </td>
-            <td class="num">{{ t.netR | number:'1.2-2' }}</td>
-            <td><p-tag [value]="t.reason" [severity]="exitSeverity(t.reason)" /></td>
-          </tr>
-        </ng-template>
-        <ng-template pTemplate="emptymessage">
-          <tr>
-            <td colspan="7" class="empty">Sin trades</td>
-          </tr>
-        </ng-template>
-      </p-table>
+              <p-accordion [multiple]="true" styleClass="bt-accordion">
+                <p-accordion-panel value="detail">
+                  <p-accordion-header>Detalle · Trades / Salidas / Curva</p-accordion-header>
+                  <p-accordion-content>
+                    <app-strategy-details [rows]="detailStrategyRows()" />
+                  </p-accordion-content>
+                </p-accordion-panel>
+              </p-accordion>
+            </div>
+          </p-tabpanel>
+
+          <p-tabpanel value="trades">
+            <div class="pane">
+              <div class="pane__bar">
+                <p-selectbutton
+                  size="small"
+                  [options]="splitOptions()"
+                  optionLabel="label"
+                  optionValue="value"
+                  [allowEmpty]="false"
+                  [ngModel]="detailSplit()"
+                  (ngModelChange)="detailSplit.set($event)" />
+                <span class="pane__hint">{{ tradeRows().length }} trades</span>
+              </div>
+
+              <p-table
+                [value]="tradeRows()"
+                styleClass="dense-table"
+                size="small"
+                stripedRows
+                [paginator]="tradeRows().length > 50"
+                [rows]="50"
+                [rowsPerPageOptions]="[50, 100, 250]"
+                [scrollable]="true"
+                [tableStyle]="{ 'min-width': '54rem' }">
+                <ng-template pTemplate="header">
+                  <tr>
+                    <th pSortableColumn="strategyId">Strat <p-sortIcon field="strategyId" /></th>
+                    <th pSortableColumn="side">Side <p-sortIcon field="side" /></th>
+                    <th pSortableColumn="entryTime">Entry <p-sortIcon field="entryTime" /></th>
+                    <th pSortableColumn="exitTime">Exit <p-sortIcon field="exitTime" /></th>
+                    <th pSortableColumn="netPnl" class="num">PnL <p-sortIcon field="netPnl" /></th>
+                    <th pSortableColumn="netR" class="num">R <p-sortIcon field="netR" /></th>
+                    <th>Reason</th>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-t>
+                  <tr>
+                    <td class="mono">{{ t.strategyId }}</td>
+                    <td><p-tag [value]="t.side" [severity]="tradeSideSeverity(t.side)" /></td>
+                    <td class="mono">{{ t.entryTime }}</td>
+                    <td class="mono">{{ t.exitTime }}</td>
+                    <td
+                      class="num"
+                      [class.pos]="(t.netPnl ?? 0) >= 0"
+                      [class.neg]="(t.netPnl ?? 0) < 0">
+                      {{ t.netPnl | number:'1.2-2' }}
+                    </td>
+                    <td class="num">{{ t.netR | number:'1.2-2' }}</td>
+                    <td><p-tag [value]="t.reason" [severity]="exitSeverity(t.reason)" /></td>
+                  </tr>
+                </ng-template>
+                <ng-template pTemplate="emptymessage">
+                  <tr>
+                    <td colspan="7" class="empty">Sin trades</td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            </div>
+          </p-tabpanel>
+
+          <p-tabpanel value="stages">
+            <div class="pane">
+              <div class="pane__bar">
+                <p-selectbutton
+                  size="small"
+                  [options]="splitOptions()"
+                  optionLabel="label"
+                  optionValue="value"
+                  [allowEmpty]="false"
+                  [ngModel]="detailSplit()"
+                  (ngModelChange)="detailSplit.set($event)" />
+              </div>
+
+              <p-accordion [multiple]="true" styleClass="bt-accordion">
+                @for (row of detailStrategyRows(); track row.id) {
+                  <p-accordion-panel [value]="row.id">
+                    <p-accordion-header>{{ row.id }}</p-accordion-header>
+                    <p-accordion-content>
+                      <div class="stages__grid">
+                        <div>
+                          <h4>Long</h4>
+                          @for (st of row.stages?.long ?? []; track $index) {
+                            <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
+                          }
+                          <p>invalidated {{ row.stages?.invalidated?.long ?? 0 }}</p>
+                        </div>
+                        <div>
+                          <h4>Short</h4>
+                          @for (st of row.stages?.short ?? []; track $index) {
+                            <p>S{{ st.index ?? $index }}: passed {{ st.passed }} · timeouts {{ st.timeouts }} · fellBack {{ st.fellBack }}</p>
+                          }
+                          <p>invalidated {{ row.stages?.invalidated?.short ?? 0 }}</p>
+                        </div>
+                      </div>
+                    </p-accordion-content>
+                  </p-accordion-panel>
+                } @empty {
+                  <p class="empty">Sin stages</p>
+                }
+              </p-accordion>
+            </div>
+          </p-tabpanel>
+
+          <p-tabpanel value="curves">
+            <div class="pane">
+              <div class="pane__bar">
+                <h3>Ganancias por mes</h3>
+                <p class="bt__legend">
+                  <span class="swatch swatch--left"></span>{{ sides().leftFullLabel }}
+                  <span class="swatch swatch--right"></span>{{ sides().rightFullLabel }}
+                </p>
+              </div>
+              <div class="bt__run-line">
+                <span class="mono">{{ runMeta('left') }}</span>
+                <span class="mono">{{ runMeta('right') }}</span>
+              </div>
+              <div #monthChart class="bt__chart"></div>
+            </div>
+          </p-tabpanel>
+        </p-tabpanels>
+      </p-tabs>
     </section>
   } @else {
-    <p class="bt__empty">Elige un informe o lanza la evaluación.</p>
+    <section class="bt__empty">
+      <i class="pi pi-chart-bar" aria-hidden="true"></i>
+      <h2>Sin informe cargado</h2>
+      <p>Elegí un informe existente o lanzá una evaluación para ver la comparación IS / OOS.</p>
+    </section>
   }
 
   @if (exportOpen()) {

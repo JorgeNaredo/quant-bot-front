@@ -6,12 +6,75 @@ import {
   TradeRow,
 } from '../../shared/models/bot-api.model';
 
-export type SplitKey = 'train' | 'walkForward' | 'holdout';
+export type SplitKey = 'train' | 'walkForward' | 'oos' | 'holdout';
+export type EvaluationMode = 'develop' | 'confirm';
+export type ComparativeSort = 'verdict' | 'rightDsr' | 'deltaDsr' | 'id';
+
+type MetricKey =
+  | 'deflatedSharpe'
+  | 'expectancyR'
+  | 'profitFactor'
+  | 'closedTrades'
+  | 'returnPct'
+  | 'maxDrawdownPct';
 
 export interface MonthlyBar {
   month: string;
-  is: number;
-  oos: number;
+  left: number;
+  right: number;
+}
+
+export interface ComparisonSides {
+  mode: EvaluationMode;
+  left: SplitKey;
+  right: SplitKey;
+  leftLabel: string;
+  rightLabel: string;
+  leftFullLabel: string;
+  rightFullLabel: string;
+  deltaLabel: string;
+}
+
+export interface ComparativeDelta {
+  deflatedSharpe?: number;
+  expectancyR?: number;
+  profitFactor?: number;
+  closedTrades?: number;
+  returnPct?: number;
+  maxDrawdownPct?: number;
+}
+
+export interface ComparativeRow {
+  id: string;
+  left: StrategyReport | null;
+  right: StrategyReport | null;
+  delta: ComparativeDelta;
+  label: string;
+  reasons: string[];
+}
+
+export interface SideKpis {
+  count: number;
+  bestDsrId: string | null;
+  bestDsr: number | null;
+  avgExpectancyR: number | null;
+  totalPnl: number;
+  trades: number;
+}
+
+export interface WinnerKpi {
+  id: string;
+  delta: ComparativeDelta;
+}
+
+export interface ComparativeKpis {
+  left: SideKpis;
+  right: SideKpis;
+  delta: {
+    leftWinner: WinnerKpi | null;
+    rightWinner: WinnerKpi | null;
+    verdicts: Array<{ label: string; count: number }>;
+  };
 }
 
 export interface ComparisonViewRow {
@@ -23,14 +86,47 @@ export interface ComparisonViewRow {
   reasons: string[];
 }
 
-export function evaluationModeOf(doc: EvaluationDocument | null | undefined): 'develop' | 'confirm' {
+export function evaluationModeOf(doc: EvaluationDocument | null | undefined): EvaluationMode {
   const mode = (doc?.evaluation?.mode || 'develop').toString().toLowerCase();
   return mode === 'confirm' ? 'confirm' : 'develop';
+}
+
+export function comparisonSides(
+  doc: EvaluationDocument | null | undefined,
+): ComparisonSides {
+  if (evaluationModeOf(doc) === 'confirm') {
+    return {
+      mode: 'confirm',
+      left: 'oos',
+      right: 'holdout',
+      leftLabel: 'OOS',
+      rightLabel: 'Holdout',
+      leftFullLabel: 'OOS (auditoría)',
+      rightFullLabel: 'Holdout',
+      deltaLabel: 'Δ Holdout − OOS',
+    };
+  }
+  return {
+    mode: 'develop',
+    left: 'train',
+    right: 'walkForward',
+    leftLabel: 'IS',
+    rightLabel: 'OOS',
+    leftFullLabel: 'IS (Train)',
+    rightFullLabel: 'OOS (Walk-forward)',
+    deltaLabel: 'Δ OOS − IS',
+  };
 }
 
 export function formatNumber(value: number | undefined | null, digits: number): string {
   if (value === undefined || value === null || Number.isNaN(value)) return '—';
   return value.toFixed(digits);
+}
+
+export function deltaText(value: number | undefined | null, digits: number): string {
+  if (value === undefined || value === null || Number.isNaN(value)) return '—';
+  const arrow = value > 0 ? '↑' : value < 0 ? '↓' : '=';
+  return `${arrow}${Math.abs(value).toFixed(digits)}`;
 }
 
 export function gradeOf(row: StrategyReport | undefined, key: string): string {
@@ -88,11 +184,8 @@ export function orderedStrategyIds(doc: EvaluationDocument): string[] {
     seen.add(id);
     ids.push(id);
   };
-  if (evaluationModeOf(doc) === 'confirm') {
-    for (const row of doc.holdout?.strategies ?? []) push(row.id);
-  } else {
-    for (const row of doc.train?.strategies ?? []) push(row.id);
-    for (const row of doc.walkForward?.strategies ?? []) push(row.id);
+  for (const split of ['train', 'walkForward', 'oos', 'holdout'] as const) {
+    for (const row of doc[split]?.strategies ?? []) push(row.id);
   }
   for (const row of doc.comparison ?? []) push(row.id);
   for (const row of doc.verdicts ?? []) push(row.id);
@@ -112,24 +205,219 @@ export function filterByStrategy<T extends { id: string }>(rows: T[], strategyId
   return rows.filter((row) => row.id === strategyId);
 }
 
+function difference(
+  from: number | undefined | null,
+  to: number | undefined | null,
+): number | undefined {
+  if (from === undefined || from === null || to === undefined || to === null) return undefined;
+  return to - from;
+}
+
+export function comparativeDelta(
+  left: StrategyReport | null,
+  right: StrategyReport | null,
+  backend?: ComparisonRow['delta'],
+): ComparativeDelta {
+  const derived = (key: MetricKey) => difference(left?.[key], right?.[key]);
+  return {
+    deflatedSharpe: backend?.deflatedSharpe ?? derived('deflatedSharpe'),
+    expectancyR: backend?.expectancyR ?? derived('expectancyR'),
+    profitFactor: derived('profitFactor'),
+    closedTrades: backend?.closedTrades ?? derived('closedTrades'),
+    returnPct: backend?.returnPct ?? derived('returnPct'),
+    maxDrawdownPct: backend?.maxDrawdownPct ?? derived('maxDrawdownPct'),
+  };
+}
+
+export function buildComparativeRows(
+  doc: EvaluationDocument,
+  strategyId: string,
+): ComparativeRow[] {
+  const sides = comparisonSides(doc);
+  const left = indexById(splitStrategies(doc, sides.left));
+  const right = indexById(splitStrategies(doc, sides.right));
+  const comparisons = indexById(doc.comparison ?? []);
+  const verdicts = indexById(doc.verdicts ?? []);
+  const ids = orderedStrategyIds(doc).filter(
+    (id) => strategyId === 'all' || id === strategyId,
+  );
+  return ids.map((id) => {
+    const leftRow = left.get(id) ?? null;
+    const rightRow = right.get(id) ?? null;
+    const verdict = verdicts.get(id);
+    return {
+      id,
+      left: leftRow,
+      right: rightRow,
+      delta: comparativeDelta(leftRow, rightRow, comparisons.get(id)?.delta),
+      label: verdict?.label ?? '—',
+      reasons: verdict?.reasons ?? [],
+    };
+  });
+}
+
+export function hasSideData(report: StrategyReport | null | undefined): boolean {
+  if (!report) return false;
+  return (
+    (report.closedTrades ?? 0) > 0 ||
+    (report.netPnl ?? 0) !== 0 ||
+    (report.deflatedSharpe ?? 0) !== 0
+  );
+}
+
+export function winnerOf(rows: ComparativeRow[], side: 'left' | 'right'): ComparativeRow | null {
+  const candidates = rows.filter((row) => {
+    const report = row[side];
+    return hasSideData(report) && report?.deflatedSharpe != null;
+  });
+  if (!candidates.length) return null;
+  return [...candidates].sort((a, b) => {
+    const left = a[side];
+    const right = b[side];
+    return (
+      (right?.deflatedSharpe ?? 0) - (left?.deflatedSharpe ?? 0) ||
+      (right?.expectancyR ?? 0) - (left?.expectancyR ?? 0) ||
+      (right?.returnPct ?? 0) - (left?.returnPct ?? 0) ||
+      a.id.localeCompare(b.id)
+    );
+  })[0];
+}
+
+export function sideKpis(rows: ComparativeRow[], side: 'left' | 'right'): SideKpis {
+  let expectancySum = 0;
+  let expectancyCount = 0;
+  let totalPnl = 0;
+  let trades = 0;
+  let count = 0;
+  for (const row of rows) {
+    const report = row[side];
+    if (!report) continue;
+    count += 1;
+    totalPnl += report.netPnl ?? 0;
+    trades += report.closedTrades ?? 0;
+    if (report.expectancyR != null) {
+      expectancySum += report.expectancyR;
+      expectancyCount += 1;
+    }
+  }
+  const winner = winnerOf(rows, side);
+  return {
+    count,
+    bestDsrId: winner?.id ?? null,
+    bestDsr: winner?.[side]?.deflatedSharpe ?? null,
+    avgExpectancyR: expectancyCount ? expectancySum / expectancyCount : null,
+    totalPnl,
+    trades,
+  };
+}
+
+const VERDICT_ORDER = ['confirmed', 'candidate', 'inconclusive', 'failed'];
+const VERDICT_RANK: Record<string, number> = {
+  confirmed: 0,
+  candidate: 1,
+  inconclusive: 2,
+  failed: 3,
+};
+
+export function verdictRank(label: string | undefined): number {
+  return VERDICT_RANK[(label ?? '').toLowerCase()] ?? VERDICT_ORDER.length;
+}
+
+export function verdictSeverity(
+  label: string | undefined,
+): 'success' | 'warn' | 'danger' | 'secondary' {
+  switch ((label ?? '').toLowerCase()) {
+    case 'confirmed':
+    case 'candidate':
+      return 'success';
+    case 'inconclusive':
+      return 'warn';
+    case 'failed':
+      return 'danger';
+    default:
+      return 'secondary';
+  }
+}
+
+export function comparativeKpis(rows: ComparativeRow[]): ComparativeKpis {
+  const left = sideKpis(rows, 'left');
+  const right = sideKpis(rows, 'right');
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const key = row.label || '—';
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const verdicts = Array.from(counts.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => verdictRank(a.label) - verdictRank(b.label) || b.count - a.count);
+  const leftWinner = winnerOf(rows, 'left');
+  const rightWinner = winnerOf(rows, 'right');
+  return {
+    left,
+    right,
+    delta: {
+      leftWinner: leftWinner ? { id: leftWinner.id, delta: leftWinner.delta } : null,
+      rightWinner: rightWinner ? { id: rightWinner.id, delta: rightWinner.delta } : null,
+      verdicts,
+    },
+  };
+}
+
+export function sortComparativeRows(
+  rows: ComparativeRow[],
+  sort: ComparativeSort,
+): ComparativeRow[] {
+  const out = [...rows];
+  const byDsr = (a: number | undefined, b: number | undefined) =>
+    (b ?? Number.NEGATIVE_INFINITY) - (a ?? Number.NEGATIVE_INFINITY);
+  switch (sort) {
+    case 'rightDsr':
+      out.sort(
+        (a, b) =>
+          byDsr(a.right?.deflatedSharpe, b.right?.deflatedSharpe) || a.id.localeCompare(b.id),
+      );
+      break;
+    case 'deltaDsr':
+      out.sort(
+        (a, b) => byDsr(a.delta.deflatedSharpe, b.delta.deflatedSharpe) || a.id.localeCompare(b.id),
+      );
+      break;
+    case 'id':
+      out.sort((a, b) => a.id.localeCompare(b.id));
+      break;
+    default:
+      out.sort(
+        (a, b) =>
+          verdictRank(a.label) - verdictRank(b.label) ||
+          byDsr(a.right?.deflatedSharpe, b.right?.deflatedSharpe) ||
+          a.id.localeCompare(b.id),
+      );
+  }
+  return out;
+}
+
 export function buildComparisonRows(
   doc: EvaluationDocument,
   strategyId: string,
 ): ComparisonViewRow[] {
   const comparisons = indexById(doc.comparison ?? []);
   const verdicts = indexById(doc.verdicts ?? []);
+  const sides = comparisonSides(doc);
   let ids = orderedStrategyIds(doc);
   if (strategyId !== 'all') {
     ids = ids.filter((id) => id === strategyId);
   }
-  const confirm = evaluationModeOf(doc) === 'confirm';
   return ids.map((id) => {
     const cmp = comparisons.get(id);
     const verdict = verdicts.get(id);
+    const leftFloor = cmp?.trainFloor ?? '—';
+    const rightFloor = cmp?.oosFloor ?? '—';
     return {
       id,
-      leftFloor: confirm ? (cmp?.oosFloor ?? '—') : (cmp?.trainFloor ?? '—'),
-      rightFloor: confirm ? (cmp?.holdoutFloor ?? '—') : (cmp?.oosFloor ?? '—'),
+      leftFloor:
+        sides.mode === 'confirm' ? (cmp?.oosFloor ?? '—') : leftFloor,
+      rightFloor:
+        sides.mode === 'confirm' ? (cmp?.holdoutFloor ?? '—') : rightFloor,
       delta: cmp?.delta,
       label: verdict?.label ?? '—',
       reasons: verdict?.reasons ?? [],
@@ -158,24 +446,21 @@ export function buildMonthlyBars(
   doc: EvaluationDocument,
   strategyId: string,
 ): MonthlyBar[] {
+  const sides = comparisonSides(doc);
   const map = new Map<string, MonthlyBar>();
-  const add = (split: SplitKey, key: 'is' | 'oos') => {
+  const add = (split: SplitKey, key: 'left' | 'right') => {
     for (const strategy of splitStrategies(doc, split)) {
       if (strategyId !== 'all' && strategy.id !== strategyId) continue;
       for (const trade of strategy.trades ?? []) {
         if (!trade.exitTime) continue;
         const month = trade.exitTime.slice(0, 7);
-        const row = map.get(month) ?? { month, is: 0, oos: 0 };
+        const row = map.get(month) ?? { month, left: 0, right: 0 };
         row[key] += trade.netPnl ?? 0;
         map.set(month, row);
       }
     }
   };
-  if (evaluationModeOf(doc) === 'confirm') {
-    add('holdout', 'oos');
-  } else {
-    add('train', 'is');
-    add('walkForward', 'oos');
-  }
+  add(sides.left, 'left');
+  add(sides.right, 'right');
   return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
 }

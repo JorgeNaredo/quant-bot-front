@@ -1,0 +1,199 @@
+:host {
+  display: block;
+}
+
+.cmp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cmp__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.cmp__panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.cmp__panel--delta {
+  border-color: color-mix(in srgb, var(--primary) 26%, var(--surface-border));
+}
+
+.cmp__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--surface-border);
+  background: color-mix(in srgb, var(--surface-elevated) 60%, transparent);
+}
+
+.cmp__panel--delta .cmp__head {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-elevated));
+}
+
+.cmp__head h3 {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmp__count {
+  flex: none;
+  font-size: 0.62rem;
+  color: var(--text-color-muted);
+}
+
+.cmp__hint {
+  flex: none;
+  font-size: 0.64rem;
+  color: var(--text-color-muted);
+}
+
+.cmp__scroll {
+  overflow-x: auto;
+}
+
+.cmp__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.cmp__col-name {
+  width: 34%;
+}
+
+.cmp__table--delta .cmp__col-name {
+  width: 28%;
+}
+
+.cmp__col-verdict {
+  width: 12%;
+}
+
+.cmp__col-reasons {
+  width: 20%;
+}
+
+.cmp__table th.num,
+.cmp__table td.num {
+  text-align: right;
+}
+
+.cmp__table thead th {
+  padding: 0.3rem 0.45rem;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--text-color-secondary);
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--surface-border);
+  white-space: nowrap;
+}
+
+.cmp__table tbody tr {
+  height: 26px;
+}
+
+.cmp__table tbody tr:nth-child(odd) {
+  background: color-mix(in srgb, var(--surface-elevated) 45%, transparent);
+}
+
+.cmp__table tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+.cmp__table tbody th,
+.cmp__table tbody td {
+  padding: 0 0.45rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-border) 55%, transparent);
+  font-weight: 400;
+  text-align: left;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.cmp__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmp__row--missing .cmp__name {
+  color: var(--text-color-muted);
+}
+
+.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.cmp__verdict {
+  overflow: hidden;
+}
+
+.cmp__motivos {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.66rem;
+  color: var(--text-color-secondary);
+}
+
+.cmp__empty {
+  padding: var(--space-4) var(--space-3);
+  text-align: center;
+  color: var(--text-color-muted);
+  font-size: 0.78rem;
+}
+
+.up {
+  color: var(--text-color);
+}
+
+.down {
+  color: var(--warning);
+}
+
+:host ::ng-deep .cmp__verdict .p-tag {
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 0.05rem 0.3rem;
+  line-height: 1.2;
+}
+
+p-paginator {
+  align-self: flex-end;
+}
+
+:host ::ng-deep .p-paginator {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 860px) {
+  .cmp__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
