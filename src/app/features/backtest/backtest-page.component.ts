@@ -3,18 +3,12 @@ import {
   AfterViewInit,
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
-  Injector,
-  OnDestroy,
-  ViewChild,
-  afterNextRender,
   computed,
   inject,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
 import { AccordionModule } from 'primeng/accordion';
 import { ButtonModule } from 'primeng/button';
 import { MessageModule } from 'primeng/message';
@@ -48,6 +42,7 @@ import {
 import { ReportExportComponent } from './report-export/report-export.component';
 import { ComparisonSummariesComponent } from './components/comparison-summaries/comparison-summaries.component';
 import { ComparativeKpisComponent } from './components/comparative-kpis/comparative-kpis.component';
+import { MonthlyChartComponent } from './components/monthly-chart/monthly-chart.component';
 import { StrategyDetailsComponent } from './components/strategy-details/strategy-details.component';
 
 type DetailTab = 'strategies' | 'trades' | 'stages' | 'curves';
@@ -69,19 +64,16 @@ type DetailTab = 'strategies' | 'trades' | 'stages' | 'curves';
     StrategyDetailsComponent,
     ComparisonSummariesComponent,
     ComparativeKpisComponent,
+    MonthlyChartComponent,
   ],
   templateUrl: './backtest-page.component.html',
   styleUrl: './backtest-page.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class BacktestPageComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('monthChart', { static: false })
-  private monthChartEl?: ElementRef<HTMLDivElement>;
-
+export class BacktestPageComponent implements AfterViewInit {
   private readonly api = inject(BotApiService);
   private readonly store = inject(SessionStoreService);
   private readonly router = inject(Router);
-  private readonly injector = inject(Injector);
 
   protected readonly session = this.store.connect;
   protected readonly evaluation = signal<EvaluationDocument | null>(null);
@@ -145,20 +137,12 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
     return doc ? buildMonthlyBars(doc, this.selectedStrategy()) : [];
   });
 
-  private chart: IChartApi | null = null;
-  private leftSeries: ISeriesApi<'Histogram'> | null = null;
-  private rightSeries: ISeriesApi<'Histogram'> | null = null;
-
   ngAfterViewInit(): void {
     if (!this.session()) {
       this.router.navigateByUrl('/');
       return;
     }
     this.refreshReportList();
-  }
-
-  ngOnDestroy(): void {
-    this.chart?.remove();
   }
 
   protected run(): void {
@@ -185,7 +169,6 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
           return;
         }
         this.applyEvaluation(response.evaluation);
-        this.refreshChart();
         this.refreshReportList(true);
       },
       error: (err) => {
@@ -204,7 +187,6 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
       next: (doc) => {
         this.busy.set(false);
         this.applyEvaluation(doc);
-        this.refreshChart();
       },
       error: (err) => {
         this.busy.set(false);
@@ -256,14 +238,10 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
 
   protected onStrategyChange(id: string): void {
     this.selectedStrategy.set(id);
-    this.refreshChart();
   }
 
   protected onTabChange(tab: string | number | undefined): void {
     this.activeTab.set((tab ?? 'strategies') as DetailTab);
-    if (tab === 'curves') {
-      afterNextRender(() => this.refreshChart(), { injector: this.injector });
-    }
   }
 
   protected openExport(): void {
@@ -332,51 +310,4 @@ export class BacktestPageComponent implements AfterViewInit, OnDestroy {
       },
     });
   }
-
-  private refreshChart(): void {
-    setTimeout(() => {
-      const host = this.monthChartEl?.nativeElement;
-      if (!host) return;
-      const width = host.clientWidth;
-      const bars = this.monthly();
-      if (!this.chart) {
-        if (!width) return;
-        this.chart = createChart(host, {
-          width,
-          height: 260,
-          layout: { background: { color: '#111827' }, textColor: '#94a3b8' },
-          grid: { vertLines: { color: '#1e2940' }, horzLines: { color: '#1e2940' } },
-          rightPriceScale: { borderColor: '#263145' },
-          timeScale: { borderColor: '#263145' },
-        });
-        this.leftSeries = this.chart.addHistogramSeries({
-          color: '#4c8dff',
-          priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
-        });
-        this.rightSeries = this.chart.addHistogramSeries({
-          color: '#22c55e',
-          priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
-        });
-      }
-      if (!width) return;
-      this.chart.resize(width, 260);
-      const leftMapped = bars.map((bar) => ({
-        time: monthToUtc(bar.month),
-        value: bar.left,
-        color: bar.left >= 0 ? '#4c8dff' : '#365fa8',
-      }));
-      const rightMapped = bars.map((bar) => ({
-        time: monthToUtc(bar.month),
-        value: bar.right,
-        color: bar.right >= 0 ? '#22c55e' : '#3f7a55',
-      }));
-      this.leftSeries?.setData(leftMapped as never);
-      this.rightSeries?.setData(rightMapped as never);
-      this.chart.timeScale().fitContent();
-    }, 0);
-  }
-}
-
-function monthToUtc(month: string): string {
-  return `${month}-01`;
 }

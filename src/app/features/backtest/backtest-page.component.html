@@ -321,7 +321,11 @@
                 <span class="mono">{{ runMeta('left') }}</span>
                 <span class="mono">{{ runMeta('right') }}</span>
               </div>
-              <div #monthChart class="bt__chart"></div>
+              <app-monthly-chart
+                [bars]="monthly()"
+                [leftLabel]="sides().leftLabel"
+                [rightLabel]="sides().rightLabel"
+              />
             </div>
           </p-tabpanel>
         </p-tabpanels>
