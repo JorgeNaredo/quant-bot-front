@@ -380,12 +380,23 @@ export function sideKpis(rows: ComparativeRow[], side: 'left' | 'right'): SideKp
   };
 }
 
-const VERDICT_ORDER = ['confirmed', 'candidate', 'inconclusive', 'failed'];
+const VERDICT_ORDER = [
+  'confirmed',
+  'candidate',
+  'inconclusive',
+  'oos_inconclusive',
+  'overfit',
+  'failed',
+  'reject',
+];
 const VERDICT_RANK: Record<string, number> = {
   confirmed: 0,
   candidate: 1,
   inconclusive: 2,
-  failed: 3,
+  oos_inconclusive: 3,
+  overfit: 4,
+  failed: 5,
+  reject: 6,
 };
 
 export function verdictRank(label: string | undefined): number {
@@ -400,8 +411,11 @@ export function verdictSeverity(
     case 'candidate':
       return 'success';
     case 'inconclusive':
+    case 'oos_inconclusive':
       return 'warn';
+    case 'overfit':
     case 'failed':
+    case 'reject':
       return 'danger';
     default:
       return 'secondary';

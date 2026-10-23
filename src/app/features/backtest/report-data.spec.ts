@@ -10,6 +10,7 @@ import {
   gradeSeverity,
   orderedStrategyIds,
   sortComparativeRows,
+  verdictRank,
   verdictSeverity,
 } from './report-data';
 
@@ -268,9 +269,23 @@ describe('report-data', () => {
 
   it('maps verdict labels to tag severities', () => {
     expect(verdictSeverity('confirmed')).toBe('success');
+    expect(verdictSeverity('candidate')).toBe('success');
     expect(verdictSeverity('inconclusive')).toBe('warn');
+    expect(verdictSeverity('oos_inconclusive')).toBe('warn');
+    expect(verdictSeverity('overfit')).toBe('danger');
     expect(verdictSeverity('failed')).toBe('danger');
+    expect(verdictSeverity('reject')).toBe('danger');
     expect(verdictSeverity('—')).toBe('secondary');
+  });
+
+  it('ranks verdicts from confirmed down to reject', () => {
+    expect(verdictRank('confirmed')).toBeLessThan(verdictRank('candidate'));
+    expect(verdictRank('candidate')).toBeLessThan(verdictRank('inconclusive'));
+    expect(verdictRank('inconclusive')).toBeLessThan(verdictRank('oos_inconclusive'));
+    expect(verdictRank('oos_inconclusive')).toBeLessThan(verdictRank('overfit'));
+    expect(verdictRank('overfit')).toBeLessThan(verdictRank('failed'));
+    expect(verdictRank('failed')).toBeLessThan(verdictRank('reject'));
+    expect(verdictRank('desconocido')).toBeGreaterThan(verdictRank('reject'));
   });
 
   it('maps grade letters to tag severities using the first letter', () => {
