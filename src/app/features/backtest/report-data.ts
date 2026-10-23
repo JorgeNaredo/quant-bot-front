@@ -42,12 +42,15 @@ export interface ComparativeDelta {
   closedTrades?: number;
   returnPct?: number;
   maxDrawdownPct?: number;
+  finalEquity?: number;
 }
 
 export interface ComparativeRow {
   id: string;
   left: StrategyReport | null;
   right: StrategyReport | null;
+  leftFloor: string;
+  rightFloor: string;
   delta: ComparativeDelta;
   label: string;
   reasons: string[];
@@ -55,6 +58,7 @@ export interface ComparativeRow {
 
 export interface WinnerKpi {
   id: string;
+  floor: string;
   deflatedSharpe: number;
   expectancyR?: number;
   returnPct?: number;
@@ -83,7 +87,7 @@ export interface ComparisonViewRow {
   id: string;
   leftFloor: string;
   rightFloor: string;
-  delta: ComparisonRow['delta'];
+  delta: ComparativeDelta;
   label: string;
   reasons: string[];
 }
@@ -133,6 +137,45 @@ export function deltaText(value: number | undefined | null, digits: number): str
 
 export function gradeOf(row: StrategyReport | undefined, key: string): string {
   return row?.grades?.[key] ?? '—';
+}
+
+export function gradeSeverity(
+  letter: string | undefined,
+): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+  switch ((letter ?? '').charAt(0).toUpperCase()) {
+    case 'A':
+      return 'success';
+    case 'B':
+      return 'info';
+    case 'C':
+      return 'warn';
+    case 'D':
+    case 'F':
+      return 'danger';
+    default:
+      return 'secondary';
+  }
+}
+
+export type FloorTone = 'excellent' | 'good' | 'regular' | 'poor' | 'none';
+
+export function floorTone(letter: string | undefined): FloorTone {
+  switch ((letter ?? '').charAt(0).toUpperCase()) {
+    case 'E':
+    case 'A':
+      return 'excellent';
+    case 'B':
+      return 'good';
+    case 'C':
+    case 'R':
+      return 'regular';
+    case 'D':
+    case 'F':
+    case 'M':
+      return 'poor';
+    default:
+      return 'none';
+  }
 }
 
 export function gradedOf(
@@ -228,7 +271,24 @@ export function comparativeDelta(
     closedTrades: backend?.closedTrades ?? derived('closedTrades'),
     returnPct: backend?.returnPct ?? derived('returnPct'),
     maxDrawdownPct: backend?.maxDrawdownPct ?? derived('maxDrawdownPct'),
+    finalEquity: difference(left?.finalEquity, right?.finalEquity),
   };
+}
+
+function floorOf(
+  comparison: ComparisonRow | undefined,
+  split: SplitKey,
+  report: StrategyReport | null,
+): string {
+  const value =
+    split === 'train'
+      ? comparison?.trainFloor
+      : split === 'walkForward'
+        ? comparison?.oosFloor
+        : split === 'oos'
+          ? comparison?.oosFloor
+          : comparison?.holdoutFloor;
+  return value ?? gradeOf(report ?? undefined, 'floor');
 }
 
 export function buildComparativeRows(
@@ -247,11 +307,14 @@ export function buildComparativeRows(
     const leftRow = left.get(id) ?? null;
     const rightRow = right.get(id) ?? null;
     const verdict = verdicts.get(id);
+    const comparison = comparisons.get(id);
     return {
       id,
       left: leftRow,
       right: rightRow,
-      delta: comparativeDelta(leftRow, rightRow, comparisons.get(id)?.delta),
+      leftFloor: floorOf(comparison, sides.left, leftRow),
+      rightFloor: floorOf(comparison, sides.right, rightRow),
+      delta: comparativeDelta(leftRow, rightRow, comparison?.delta),
       label: verdict?.label ?? '—',
       reasons: verdict?.reasons ?? [],
     };
@@ -306,6 +369,7 @@ export function sideKpis(rows: ComparativeRow[], side: 'left' | 'right'): SideKp
       winner && report
         ? {
             id: winner.id,
+            floor: side === 'left' ? winner.leftFloor : winner.rightFloor,
             deflatedSharpe: report.deflatedSharpe ?? 0,
             expectancyR: report.expectancyR,
             returnPct: report.returnPct,
@@ -403,29 +467,14 @@ export function buildComparisonRows(
   doc: EvaluationDocument,
   strategyId: string,
 ): ComparisonViewRow[] {
-  const comparisons = indexById(doc.comparison ?? []);
-  const verdicts = indexById(doc.verdicts ?? []);
-  const sides = comparisonSides(doc);
-  let ids = orderedStrategyIds(doc);
-  if (strategyId !== 'all') {
-    ids = ids.filter((id) => id === strategyId);
-  }
-  return ids.map((id) => {
-    const cmp = comparisons.get(id);
-    const verdict = verdicts.get(id);
-    const leftFloor = cmp?.trainFloor ?? '—';
-    const rightFloor = cmp?.oosFloor ?? '—';
-    return {
-      id,
-      leftFloor:
-        sides.mode === 'confirm' ? (cmp?.oosFloor ?? '—') : leftFloor,
-      rightFloor:
-        sides.mode === 'confirm' ? (cmp?.holdoutFloor ?? '—') : rightFloor,
-      delta: cmp?.delta,
-      label: verdict?.label ?? '—',
-      reasons: verdict?.reasons ?? [],
-    };
-  });
+  return buildComparativeRows(doc, strategyId).map((row) => ({
+    id: row.id,
+    leftFloor: row.leftFloor,
+    rightFloor: row.rightFloor,
+    delta: row.delta,
+    label: row.label,
+    reasons: row.reasons,
+  }));
 }
 
 export function collectTrades(

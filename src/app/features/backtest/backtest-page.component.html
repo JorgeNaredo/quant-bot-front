@@ -180,7 +180,7 @@
     <section class="bt__detail">
       <p-tabs class="bt-tabs" [value]="activeTab()" (valueChange)="onTabChange($event)">
         <p-tablist>
-          <p-tab value="strategies"><i class="pi pi-table" aria-hidden="true"></i> Estrategias</p-tab>
+          <p-tab value="strategies"><i class="pi pi-bars" aria-hidden="true"></i> Detalle</p-tab>
           <p-tab value="trades"><i class="pi pi-list" aria-hidden="true"></i> Trades</p-tab>
           <p-tab value="stages"><i class="pi pi-sitemap" aria-hidden="true"></i> Stages</p-tab>
           <p-tab value="curves"><i class="pi pi-chart-bar" aria-hidden="true"></i> Curvas</p-tab>
@@ -201,16 +201,7 @@
                 <span class="pane__hint">{{ detailStrategyRows().length }} estrategias</span>
               </div>
 
-              <app-strategy-summary-table [rows]="detailStrategyRows()" />
-
-              <p-accordion [multiple]="true" styleClass="bt-accordion">
-                <p-accordion-panel value="detail">
-                  <p-accordion-header>Detalle · Trades / Salidas / Curva</p-accordion-header>
-                  <p-accordion-content>
-                    <app-strategy-details [rows]="detailStrategyRows()" />
-                  </p-accordion-content>
-                </p-accordion-panel>
-              </p-accordion>
+              <app-strategy-details [rows]="detailStrategyRows()" />
             </div>
           </p-tabpanel>
 

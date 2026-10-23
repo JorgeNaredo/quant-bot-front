@@ -74,23 +74,31 @@
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: var(--text-table);
+  font-size: 0.78rem;
 }
 
 .cmp__col-name {
-  width: 34%;
+  width: 21%;
+}
+
+.cmp__col-floor {
+  width: 6%;
+}
+
+.cmp__col-sample {
+  width: 9%;
 }
 
 .cmp__table--delta .cmp__col-name {
-  width: 28%;
+  width: 22%;
 }
 
 .cmp__col-verdict {
-  width: 12%;
+  width: 9%;
 }
 
 .cmp__col-reasons {
-  width: 20%;
+  width: 19%;
 }
 
 .cmp__table th.num,
@@ -99,7 +107,7 @@
 }
 
 .cmp__table thead th {
-  padding: 0.3rem 0.45rem;
+  padding: 0.28rem 0.3rem;
   font-size: var(--text-table-head);
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -125,7 +133,7 @@
 
 .cmp__table tbody th,
 .cmp__table tbody td {
-  padding: 0 0.45rem;
+  padding: 0 0.2rem;
   border-bottom: 1px solid color-mix(in srgb, var(--surface-border) 55%, transparent);
   font-weight: 400;
   text-align: left;
@@ -138,6 +146,11 @@
   text-overflow: ellipsis;
 }
 
+.cmp__table tbody th.cmp__name--winner {
+  font-weight: 700;
+  color: var(--text-color);
+}
+
 .cmp__row--missing .cmp__name {
   color: var(--text-color-muted);
 }
@@ -146,6 +159,16 @@
   text-align: right;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+.cmp__grade {
+  margin-right: 0.2em;
+  font-size: 0.62rem;
+  color: var(--text-color-muted);
+}
+
+.cmp__floor {
+  overflow: hidden;
 }
 
 .cmp__verdict {
@@ -170,15 +193,41 @@
   color: var(--text-color);
 }
 
-.down {
+.warn {
   color: var(--warning);
 }
 
-:host ::ng-deep .cmp__verdict .p-tag {
+:host ::ng-deep .cmp__verdict .p-tag,
+:host ::ng-deep .cmp__floor .p-tag {
   font-size: var(--text-table-tag);
   font-weight: 700;
   padding: 0.05rem 0.3rem;
   line-height: 1.2;
+}
+
+:host ::ng-deep .cmp__floor .p-tag.floor--excellent {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 16%, transparent);
+}
+
+:host ::ng-deep .cmp__floor .p-tag.floor--good {
+  color: var(--success-soft);
+  background: color-mix(in srgb, var(--success-soft) 16%, transparent);
+}
+
+:host ::ng-deep .cmp__floor .p-tag.floor--regular {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+}
+
+:host ::ng-deep .cmp__floor .p-tag.floor--poor {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
+:host ::ng-deep .cmp__floor .p-tag.floor--none {
+  color: var(--text-color-muted);
+  background: color-mix(in srgb, var(--text-color-muted) 12%, transparent);
 }
 
 p-paginator {

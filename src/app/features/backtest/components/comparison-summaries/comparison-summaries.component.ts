@@ -1,12 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { TagModule } from 'primeng/tag';
+import { StrategyReport } from '../../../../shared/models/bot-api.model';
 import {
   ComparativeRow,
   ComparisonSides,
   deltaText,
+  floorTone,
   formatNumber,
+  gradeOf,
   verdictSeverity,
+  winnerOf,
 } from '../../report-data';
 
 @Component({
@@ -41,6 +45,9 @@ export class ComparisonSummariesComponent {
     return this.rows().slice(start, start + size);
   });
 
+  protected readonly leftWinnerId = computed(() => winnerOf(this.rows(), 'left')?.id ?? null);
+  protected readonly rightWinnerId = computed(() => winnerOf(this.rows(), 'right')?.id ?? null);
+
   protected onPage(event: PaginatorState): void {
     if (event.rows && event.rows !== this.pageSize()) {
       this.pageSize.set(event.rows);
@@ -60,6 +67,25 @@ export class ComparisonSummariesComponent {
 
   protected severity(label: string): 'success' | 'warn' | 'danger' | 'secondary' {
     return verdictSeverity(label);
+  }
+
+  protected toneOf(letter: string): string {
+    return floorTone(letter);
+  }
+
+  protected sample(report: StrategyReport | null): string {
+    if (!report) return '—';
+    return report.sampleEnough ? 'sí' : 'no';
+  }
+
+  protected gradedCell(
+    report: StrategyReport | null,
+    key: string,
+    value: number | undefined | null,
+    digits: number,
+  ): { letter: string; value: string } | null {
+    if (!report) return null;
+    return { letter: gradeOf(report, key), value: formatNumber(value, digits) };
   }
 
   protected reasonsText(row: ComparativeRow): string {

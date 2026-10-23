@@ -6,6 +6,8 @@ import {
   comparisonSides,
   deltaText,
   evaluationModeOf,
+  floorTone,
+  gradeSeverity,
   orderedStrategyIds,
   sortComparativeRows,
   verdictSeverity,
@@ -127,6 +129,39 @@ describe('report-data', () => {
     expect(alpha.delta.closedTrades).toBe(0);
   });
 
+  it('exposes the floors of each compared side', () => {
+    const develop = buildComparativeRows(document('develop'), 'all');
+    expect(develop[0].leftFloor).toBe('A');
+    expect(develop[0].rightFloor).toBe('B');
+
+    const confirm = buildComparativeRows(document('confirm'), 'alpha');
+    expect(confirm[0].leftFloor).toBe('B');
+    expect(confirm[0].rightFloor).toBe('C');
+  });
+
+  it('falls back to the report grade when the comparison omits floors', () => {
+    const doc = document('develop');
+    doc.comparison = [];
+    doc.train!.strategies = [
+      strategy('alpha', { grades: { floor: 'M' } }),
+    ];
+    doc.walkForward!.strategies = [
+      strategy('alpha', { grades: { floor: 'N' } }),
+    ];
+    const row = buildComparativeRows(doc, 'alpha')[0];
+    expect(row.leftFloor).toBe('M');
+    expect(row.rightFloor).toBe('N');
+  });
+
+  it('derives the equity delta from both sides', () => {
+    const doc = document('develop');
+    doc.comparison = [];
+    doc.train!.strategies = [strategy('alpha', { finalEquity: 1250 })];
+    doc.walkForward!.strategies = [strategy('alpha', { finalEquity: 1100 })];
+    const row = buildComparativeRows(doc, 'alpha')[0];
+    expect(row.delta.finalEquity).toBe(-150);
+  });
+
   it('filters by strategy id', () => {
     const rows = buildComparativeRows(document('develop'), 'beta');
     expect(rows.map((row) => row.id)).toEqual(['beta']);
@@ -139,10 +174,12 @@ describe('report-data', () => {
     expect(kpis.left.trades).toBe(20);
     expect(kpis.left.winner?.id).toBe('alpha');
     expect(kpis.left.winner?.deflatedSharpe).toBe(1.2);
+    expect(kpis.left.winner?.floor).toBe('A');
     expect(kpis.left.winner?.delta.deflatedSharpe).toBe(-0.3);
     expect(kpis.right.count).toBe(2);
     expect(kpis.right.totalPnl).toBe(300);
     expect(kpis.right.winner?.id).toBe('alpha');
+    expect(kpis.right.winner?.floor).toBe('B');
     expect(kpis.delta.leftWinner?.id).toBe('alpha');
     expect(kpis.delta.rightWinner?.id).toBe('alpha');
     expect(kpis.delta.leftWinner?.delta.deflatedSharpe).toBe(-0.3);
@@ -234,5 +271,26 @@ describe('report-data', () => {
     expect(verdictSeverity('inconclusive')).toBe('warn');
     expect(verdictSeverity('failed')).toBe('danger');
     expect(verdictSeverity('—')).toBe('secondary');
+  });
+
+  it('maps grade letters to tag severities using the first letter', () => {
+    expect(gradeSeverity('A')).toBe('success');
+    expect(gradeSeverity('B')).toBe('info');
+    expect(gradeSeverity('C')).toBe('warn');
+    expect(gradeSeverity('D')).toBe('danger');
+    expect(gradeSeverity('F')).toBe('danger');
+    expect(gradeSeverity('MB')).toBe('secondary');
+    expect(gradeSeverity('—')).toBe('secondary');
+  });
+
+  it('maps floor letters to the M-R-B-E tone scale', () => {
+    expect(floorTone('E')).toBe('excellent');
+    expect(floorTone('B')).toBe('good');
+    expect(floorTone('R')).toBe('regular');
+    expect(floorTone('M')).toBe('poor');
+    expect(floorTone('A')).toBe('excellent');
+    expect(floorTone('C')).toBe('regular');
+    expect(floorTone('MB')).toBe('poor');
+    expect(floorTone('—')).toBe('none');
   });
 });

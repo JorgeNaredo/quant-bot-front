@@ -5,6 +5,7 @@ import {
   ComparativeKpis,
   ComparisonSides,
   deltaText,
+  floorTone,
   formatNumber,
   verdictSeverity,
 } from '../../report-data';
@@ -59,6 +60,10 @@ export class ComparativeKpisComponent {
 
   protected severity(label: string): 'success' | 'warn' | 'danger' | 'secondary' {
     return verdictSeverity(label);
+  }
+
+  protected toneOf(letter: string): string {
+    return floorTone(letter);
   }
 
   protected tone(value: number | null | undefined): 'up' | 'down' | 'flat' {

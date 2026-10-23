@@ -10,29 +10,77 @@
           <caption class="sr-only">{{ sides().leftFullLabel }} por estrategia</caption>
           <colgroup>
             <col class="cmp__col-name" />
-            <col span="4" />
+            <col class="cmp__col-floor" />
+            <col class="cmp__col-sample" />
+            <col span="7" />
           </colgroup>
           <thead>
             <tr>
               <th scope="col">Estrategia</th>
+              <th scope="col">Piso</th>
+              <th scope="col">Muestra</th>
               <th scope="col" class="num">DSR</th>
               <th scope="col" class="num">E[R]</th>
               <th scope="col" class="num">PF</th>
+              <th scope="col" class="num">DD%</th>
+              <th scope="col" class="num">Trades</th>
+              <th scope="col" class="num">Equity</th>
               <th scope="col" class="num">Ret%</th>
             </tr>
           </thead>
           <tbody>
             @for (row of visible(); track row.id) {
               <tr [class.cmp__row--missing]="!row.left">
-                <th scope="row" class="cmp__name mono" [title]="row.id">{{ row.id }}</th>
-                <td class="num">{{ num(row.left?.deflatedSharpe, 2) }}</td>
-                <td class="num">{{ num(row.left?.expectancyR, 3) }}</td>
-                <td class="num">{{ num(row.left?.profitFactor, 2) }}</td>
+                <th
+                  scope="row"
+                  class="cmp__name mono"
+                  [class.cmp__name--winner]="row.id === leftWinnerId()"
+                  [title]="row.id">{{ row.id }}</th>
+                <td class="cmp__floor">
+                  <p-tag [value]="row.leftFloor" [styleClass]="'floor floor--' + toneOf(row.leftFloor)" />
+                </td>
+                <td>{{ sample(row.left) }}</td>
+                <td class="num">
+                  @if (gradedCell(row.left, 'deflatedSharpe', row.left?.deflatedSharpe, 2); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">
+                  @if (gradedCell(row.left, 'expectancyR', row.left?.expectancyR, 3); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">
+                  @if (gradedCell(row.left, 'profitFactor', row.left?.profitFactor, 2); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">
+                  @if (gradedCell(row.left, 'maxDrawdownPct', row.left?.maxDrawdownPct, 1); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">
+                  @if (gradedCell(row.left, 'closedTrades', row.left?.closedTrades, 0); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">{{ num(row.left?.finalEquity, 2) }}</td>
                 <td class="num">{{ num(row.left?.returnPct, 1) }}</td>
               </tr>
             } @empty {
               <tr>
-                <td class="cmp__empty" colspan="5">Sin estrategias</td>
+                <td class="cmp__empty" colspan="10">Sin estrategias</td>
               </tr>
             }
           </tbody>
@@ -50,29 +98,77 @@
           <caption class="sr-only">{{ sides().rightFullLabel }} por estrategia</caption>
           <colgroup>
             <col class="cmp__col-name" />
-            <col span="4" />
+            <col class="cmp__col-floor" />
+            <col class="cmp__col-sample" />
+            <col span="7" />
           </colgroup>
           <thead>
             <tr>
               <th scope="col">Estrategia</th>
+              <th scope="col">Piso</th>
+              <th scope="col">Muestra</th>
               <th scope="col" class="num">DSR</th>
               <th scope="col" class="num">E[R]</th>
               <th scope="col" class="num">PF</th>
+              <th scope="col" class="num">DD%</th>
+              <th scope="col" class="num">Trades</th>
+              <th scope="col" class="num">Equity</th>
               <th scope="col" class="num">Ret%</th>
             </tr>
           </thead>
           <tbody>
             @for (row of visible(); track row.id) {
               <tr [class.cmp__row--missing]="!row.right">
-                <th scope="row" class="cmp__name mono" [title]="row.id">{{ row.id }}</th>
-                <td class="num">{{ num(row.right?.deflatedSharpe, 2) }}</td>
-                <td class="num">{{ num(row.right?.expectancyR, 3) }}</td>
-                <td class="num">{{ num(row.right?.profitFactor, 2) }}</td>
+                <th
+                  scope="row"
+                  class="cmp__name mono"
+                  [class.cmp__name--winner]="row.id === rightWinnerId()"
+                  [title]="row.id">{{ row.id }}</th>
+                <td class="cmp__floor">
+                  <p-tag [value]="row.rightFloor" [styleClass]="'floor floor--' + toneOf(row.rightFloor)" />
+                </td>
+                <td>{{ sample(row.right) }}</td>
+                <td class="num">
+                  @if (gradedCell(row.right, 'deflatedSharpe', row.right?.deflatedSharpe, 2); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">
+                  @if (gradedCell(row.right, 'expectancyR', row.right?.expectancyR, 3); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">
+                  @if (gradedCell(row.right, 'profitFactor', row.right?.profitFactor, 2); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">
+                  @if (gradedCell(row.right, 'maxDrawdownPct', row.right?.maxDrawdownPct, 1); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">
+                  @if (gradedCell(row.right, 'closedTrades', row.right?.closedTrades, 0); as cell) {
+                    <span class="cmp__grade">{{ cell.letter }}</span>{{ cell.value }}
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="num">{{ num(row.right?.finalEquity, 2) }}</td>
                 <td class="num">{{ num(row.right?.returnPct, 1) }}</td>
               </tr>
             } @empty {
               <tr>
-                <td class="cmp__empty" colspan="5">Sin estrategias</td>
+                <td class="cmp__empty" colspan="10">Sin estrategias</td>
               </tr>
             }
           </tbody>
@@ -91,7 +187,7 @@
         <caption class="sr-only">{{ sides().deltaLabel }} por estrategia</caption>
         <colgroup>
           <col class="cmp__col-name" />
-          <col span="4" />
+          <col span="7" />
           <col class="cmp__col-verdict" />
           <col class="cmp__col-reasons" />
         </colgroup>
@@ -101,6 +197,9 @@
             <th scope="col" class="num">ΔDSR</th>
             <th scope="col" class="num">ΔE[R]</th>
             <th scope="col" class="num">ΔPF</th>
+            <th scope="col" class="num">ΔDD%</th>
+            <th scope="col" class="num">ΔTrades</th>
+            <th scope="col" class="num">ΔEquity</th>
             <th scope="col" class="num">ΔRet%</th>
             <th scope="col">Veredicto</th>
             <th scope="col">Motivos</th>
@@ -109,29 +208,47 @@
         <tbody>
           @for (row of visible(); track row.id) {
             <tr>
-              <th scope="row" class="cmp__name mono" [title]="row.id">{{ row.id }}</th>
+              <th
+                scope="row"
+                class="cmp__name mono"
+                [class.cmp__name--winner]="row.id === leftWinnerId() || row.id === rightWinnerId()"
+                [title]="row.id">{{ row.id }}</th>
               <td
                 class="num"
                 [class.up]="isUp(row.delta.deflatedSharpe)"
-                [class.down]="isDown(row.delta.deflatedSharpe)">
+                [class.warn]="isDown(row.delta.deflatedSharpe)">
                 {{ delta(row.delta.deflatedSharpe, 2) }}
               </td>
               <td
                 class="num"
                 [class.up]="isUp(row.delta.expectancyR)"
-                [class.down]="isDown(row.delta.expectancyR)">
+                [class.warn]="isDown(row.delta.expectancyR)">
                 {{ delta(row.delta.expectancyR, 3) }}
               </td>
               <td
                 class="num"
                 [class.up]="isUp(row.delta.profitFactor)"
-                [class.down]="isDown(row.delta.profitFactor)">
+                [class.warn]="isDown(row.delta.profitFactor)">
                 {{ delta(row.delta.profitFactor, 2) }}
               </td>
               <td
                 class="num"
+                [class.warn]="isUp(row.delta.maxDrawdownPct)">
+                {{ delta(row.delta.maxDrawdownPct, 1) }}
+              </td>
+              <td class="num">
+                {{ delta(row.delta.closedTrades, 0) }}
+              </td>
+              <td
+                class="num"
+                [class.up]="isUp(row.delta.finalEquity)"
+                [class.warn]="isDown(row.delta.finalEquity)">
+                {{ delta(row.delta.finalEquity, 2) }}
+              </td>
+              <td
+                class="num"
                 [class.up]="isUp(row.delta.returnPct)"
-                [class.down]="isDown(row.delta.returnPct)">
+                [class.warn]="isDown(row.delta.returnPct)">
                 {{ delta(row.delta.returnPct, 1) }}
               </td>
               <td class="cmp__verdict">
@@ -143,7 +260,7 @@
             </tr>
           } @empty {
             <tr>
-              <td class="cmp__empty" colspan="7">Sin comparación</td>
+              <td class="cmp__empty" colspan="10">Sin comparación</td>
             </tr>
           }
         </tbody>

@@ -4,13 +4,15 @@
       <h3>{{ sides().leftFullLabel }}</h3>
       <span class="kpi__count mono">{{ kpis().left.count }}</span>
     </header>
+    @if (kpis().left.winner; as winner) {
+      <p class="kpi__winner mono" [title]="winner.id">{{ winner.id }}</p>
+    } @else {
+      <p class="kpi__winner kpi__winner--empty mono">Sin ganadora</p>
+    }
     <dl class="kpi__grid">
       <div class="kpi__cell">
-        <dt>Ganadora</dt>
+        <dt>DSR</dt>
         <dd class="kpi__value mono">{{ num(kpis().left.winner?.deflatedSharpe, 2) }}</dd>
-        @if (kpis().left.winner; as winner) {
-          <span class="kpi__id mono" [title]="winner.id">{{ winner.id }}</span>
-        }
       </div>
       <div class="kpi__cell">
         <dt>E[R]</dt>
@@ -33,6 +35,12 @@
     <p class="kpi__foot mono">
       PnL total {{ num(kpis().left.totalPnl, 2) }} · {{ kpis().left.trades }} trades
     </p>
+    @if (kpis().left.winner; as winner) {
+      <span
+        [class]="'kpi__floor kpi__floor--' + toneOf(winner.floor)"
+        [title]="'Piso ' + winner.floor"
+        aria-hidden="true">{{ winner.floor }}</span>
+    }
   </article>
 
   <article class="kpi">
@@ -40,13 +48,15 @@
       <h3>{{ sides().rightFullLabel }}</h3>
       <span class="kpi__count mono">{{ kpis().right.count }}</span>
     </header>
+    @if (kpis().right.winner; as winner) {
+      <p class="kpi__winner mono" [title]="winner.id">{{ winner.id }}</p>
+    } @else {
+      <p class="kpi__winner kpi__winner--empty mono">Sin ganadora</p>
+    }
     <dl class="kpi__grid">
       <div class="kpi__cell">
-        <dt>Ganadora</dt>
+        <dt>DSR</dt>
         <dd class="kpi__value mono">{{ num(kpis().right.winner?.deflatedSharpe, 2) }}</dd>
-        @if (kpis().right.winner; as winner) {
-          <span class="kpi__id mono" [title]="winner.id">{{ winner.id }}</span>
-        }
       </div>
       <div class="kpi__cell">
         <dt>E[R]</dt>
@@ -69,6 +79,12 @@
     <p class="kpi__foot mono">
       PnL total {{ num(kpis().right.totalPnl, 2) }} · {{ kpis().right.trades }} trades
     </p>
+    @if (kpis().right.winner; as winner) {
+      <span
+        [class]="'kpi__floor kpi__floor--' + toneOf(winner.floor)"
+        [title]="'Piso ' + winner.floor"
+        aria-hidden="true">{{ winner.floor }}</span>
+    }
   </article>
 
   <article class="kpi kpi--delta">

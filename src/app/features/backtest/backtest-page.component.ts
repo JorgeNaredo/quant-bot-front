@@ -49,7 +49,6 @@ import { ReportExportComponent } from './report-export/report-export.component';
 import { ComparisonSummariesComponent } from './components/comparison-summaries/comparison-summaries.component';
 import { ComparativeKpisComponent } from './components/comparative-kpis/comparative-kpis.component';
 import { StrategyDetailsComponent } from './components/strategy-details/strategy-details.component';
-import { StrategySummaryTableComponent } from './components/strategy-summary-table/strategy-summary-table.component';
 
 type DetailTab = 'strategies' | 'trades' | 'stages' | 'curves';
 
@@ -67,7 +66,6 @@ type DetailTab = 'strategies' | 'trades' | 'stages' | 'curves';
     TableModule,
     TabsModule,
     TagModule,
-    StrategySummaryTableComponent,
     StrategyDetailsComponent,
     ComparisonSummariesComponent,
     ComparativeKpisComponent,
