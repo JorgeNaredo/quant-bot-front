@@ -1,15 +1,18 @@
 import { EvaluationDocument } from '../../../shared/models/bot-api.model';
 import { SplitKey } from '../report-data';
 import {
+  SplitScope,
   REPORT_SECTIONS,
   ReportExportOptions,
-  SplitScope,
+  exportSplits,
+  monthlySplits,
 } from './report-export.types';
 import {
   ReportTable,
   STAGE_HEADERS,
   buildDetailTables,
   buildMetaTable,
+  buildMonthlyErTable,
   buildMonthlyTable,
   buildResultTable,
   buildStageGroups,
@@ -81,7 +84,18 @@ export function buildCsvReport(
   }
   if (selected.has('monthly')) {
     blocks.push(
-      serializeCsvBlock('monthly', buildMonthlyTable(doc, strategyId)),
+      serializeCsvBlock(
+        'monthly',
+        buildMonthlyTable(doc, strategyId, monthlySplits(doc, options.monthlySplit)),
+      ),
+    );
+  }
+  if (selected.has('monthlyEr')) {
+    blocks.push(
+      serializeCsvBlock(
+        'monthly_er',
+        buildMonthlyErTable(doc, strategyId, monthlySplits(doc, options.monthlySplit)),
+      ),
     );
   }
   if (selected.has('stages')) {
@@ -126,7 +140,7 @@ function addStageBlocks(
   strategyId: string,
   scope: SplitScope,
 ): void {
-  for (const split of splitKeys(scope)) {
+  for (const split of exportSplits(scope)) {
     const groups = buildStageGroups(doc, split, strategyId);
     const key =
       split === 'train' ? 'train' : split === 'holdout' ? 'holdout' : 'walk_forward';
@@ -157,20 +171,13 @@ function addTradeBlocks(
   strategyId: string,
   scope: SplitScope,
 ): void {
-  for (const split of splitKeys(scope)) {
+  for (const split of exportSplits(scope)) {
     const key =
       split === 'train' ? 'train' : split === 'holdout' ? 'holdout' : 'walk_forward';
     blocks.push(
       serializeCsvBlock(`trades_${key}`, buildTradeTable(doc, split, strategyId)),
     );
   }
-}
-
-function splitKeys(scope: SplitScope): SplitKey[] {
-  if (scope === 'train') return ['train'];
-  if (scope === 'walkForward') return ['walkForward'];
-  if (scope === 'holdout') return ['holdout'];
-  return ['train', 'walkForward'];
 }
 
 function csvCell(value: string | undefined | null): string {

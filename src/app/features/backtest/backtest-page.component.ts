@@ -30,12 +30,16 @@ import {
   MonthlyBar,
   SplitKey,
   TradeHistogram,
+  CumulativeR,
   buildComparativeRows,
+  buildCumulativeR,
   buildMonthlyBars,
   buildTradeHistogram,
   collectTrades,
   comparativeKpis,
   comparisonSides,
+  cumulativeCount,
+  EMPTY_CUMULATIVE_R,
   EMPTY_HISTOGRAM,
   evLabel,
   filterByStrategy,
@@ -52,10 +56,11 @@ import { ComparisonSummariesComponent } from './components/comparison-summaries/
 import { ComparativeKpisComponent } from './components/comparative-kpis/comparative-kpis.component';
 import { MonthlyChartComponent } from './components/monthly-chart/monthly-chart.component';
 import { StrategyDetailsComponent } from './components/strategy-details/strategy-details.component';
+import { RCurveComponent } from './components/r-curve/r-curve.component';
 import { TradeHistogramComponent } from './components/trade-histogram/trade-histogram.component';
 
 type DetailTab = 'strategies' | 'trades' | 'stages' | 'curves';
-type ChartView = 'monthly' | 'distribution';
+type ChartView = 'monthly' | 'distribution' | 'rCurve';
 
 @Component({
   selector: 'app-backtest-page',
@@ -76,6 +81,7 @@ type ChartView = 'monthly' | 'distribution';
     TradeHistogramComponent,
     ComparativeKpisComponent,
     MonthlyChartComponent,
+    RCurveComponent,
   ],
   templateUrl: './backtest-page.component.html',
   styleUrl: './backtest-page.component.css',
@@ -155,17 +161,28 @@ export class BacktestPageComponent implements AfterViewInit {
     return doc ? buildTradeHistogram(doc, this.selectedStrategy()) : EMPTY_HISTOGRAM;
   });
 
+  protected readonly cumulativeAll = computed(() => {
+    const doc = this.evaluation();
+    return doc ? buildCumulativeR(doc, this.selectedStrategy()) : EMPTY_CUMULATIVE_R;
+  });
+
   protected readonly chartViewOptions = [
     { label: 'Mensual', value: 'monthly' as ChartView },
     { label: 'Distribución', value: 'distribution' as ChartView },
+    { label: 'R acumulado', value: 'rCurve' as ChartView },
   ];
 
-  protected readonly curveTitle = computed(() =>
-    this.chartView() === 'monthly' ? 'Ganancias por mes' : 'Distribución de R por operación',
-  );
+  protected readonly curveTitle = computed(() => {
+    const view = this.chartView();
+    return view === 'monthly'
+      ? 'Ganancias por mes'
+      : view === 'distribution'
+        ? 'Distribución de R por operación'
+        : 'R acumulado por operación';
+  });
 
   protected readonly chartStrategies = computed<
-    { id: string; bars: MonthlyBar[]; histogram: TradeHistogram }[]
+    { id: string; bars: MonthlyBar[]; histogram: TradeHistogram; cumulative: CumulativeR }[]
   >(() => {
     const doc = this.evaluation();
     if (!doc) return [];
@@ -180,12 +197,13 @@ export class BacktestPageComponent implements AfterViewInit {
         id,
         bars: buildMonthlyBars(doc, id),
         histogram: buildTradeHistogram(doc, id),
+        cumulative: buildCumulativeR(doc, id),
       }))
-      .filter((entry) =>
-        view === 'monthly'
-          ? sliceMonthlyBars(entry.bars, visible).length > 0
-          : histogramTotal(entry.histogram, visible) > 0,
-      );
+      .filter((entry) => {
+        if (view === 'monthly') return sliceMonthlyBars(entry.bars, visible).length > 0;
+        if (view === 'distribution') return histogramTotal(entry.histogram, visible) > 0;
+        return cumulativeCount(entry.cumulative, visible) > 0;
+      });
   });
 
   protected readonly chartSideOptions = computed(() => {

@@ -5,6 +5,8 @@ import {
   ReportExportOptions,
   ReportSection,
   SplitScope,
+  exportSplits,
+  monthlySplits,
 } from './report-export.types';
 import {
   ReportTable,
@@ -12,6 +14,7 @@ import {
   STAGE_HEADERS,
   buildDetailTables,
   buildMetaTable,
+  buildMonthlyErTable,
   buildMonthlyTable,
   buildResultTable,
   buildStageGroups,
@@ -51,7 +54,8 @@ export function buildMarkdownReport(
   add('holdoutSummary', renderSummary(doc, 'holdout', strategyId));
   add('holdoutDetails', renderDetails(doc, 'holdout', strategyId));
   add('result', renderResult(doc, strategyId));
-  add('monthly', renderMonthly(doc, strategyId));
+  add('monthly', renderMonthly(doc, strategyId, options.monthlySplit));
+  add('monthlyEr', renderMonthlyEr(doc, strategyId, options.monthlySplit));
   add('stages', renderStages(doc, strategyId, options.stagesSplit));
   add('trades', renderTrades(doc, strategyId, options.tradesSplit));
 
@@ -116,12 +120,34 @@ function renderResult(doc: EvaluationDocument, strategyId: string): string {
   return lines.join('\n\n');
 }
 
-function renderMonthly(doc: EvaluationDocument, strategyId: string): string {
+function renderMonthly(
+  doc: EvaluationDocument,
+  strategyId: string,
+  scope: SplitScope,
+): string {
   const title =
     evaluationModeOf(doc) === 'confirm'
       ? '## Ganancias por mes (holdout)'
       : '## Ganancias por mes (IS / OOS)';
-  return [title, markdownTable(buildMonthlyTable(doc, strategyId))].join('\n\n');
+  return [
+    title,
+    markdownTable(buildMonthlyTable(doc, strategyId, monthlySplits(doc, scope))),
+  ].join('\n\n');
+}
+
+function renderMonthlyEr(
+  doc: EvaluationDocument,
+  strategyId: string,
+  scope: SplitScope,
+): string {
+  const title =
+    evaluationModeOf(doc) === 'confirm'
+      ? '## E[R] por mes (holdout)'
+      : '## E[R] por mes (IS / OOS)';
+  return [
+    title,
+    markdownTable(buildMonthlyErTable(doc, strategyId, monthlySplits(doc, scope))),
+  ].join('\n\n');
 }
 
 function renderStages(
@@ -130,9 +156,9 @@ function renderStages(
   scope: SplitScope,
 ): string {
   const lines = ['## Stages'];
-  for (const split of splitKeys(scope)) {
-    lines.push(`### ${splitLabel(split)}`);
-    const groups = buildStageGroups(doc, split, strategyId);
+    for (const split of exportSplits(scope)) {
+      lines.push(`### ${splitLabel(split)}`);
+      const groups = buildStageGroups(doc, split, strategyId);
     if (groups.length === 0) {
       lines.push('_Sin datos._');
       continue;
@@ -164,7 +190,7 @@ function renderTrades(
   scope: SplitScope,
 ): string {
   const lines = ['## Trades individuales'];
-  for (const split of splitKeys(scope)) {
+  for (const split of exportSplits(scope)) {
     lines.push(`### ${splitLabel(split)}`);
     const table = buildTradeTable(doc, split, strategyId);
     if (table.rows.length === 0) {
@@ -193,13 +219,6 @@ function mdCell(value: string): string {
 
 function mdInline(value: string): string {
   return String(value ?? '').replace(/\r?\n/g, ' ').trim();
-}
-
-function splitKeys(scope: SplitScope): SplitKey[] {
-  if (scope === 'train') return ['train'];
-  if (scope === 'walkForward') return ['walkForward'];
-  if (scope === 'holdout') return ['holdout'];
-  return ['train', 'walkForward'];
 }
 
 function splitLabel(split: SplitKey): string {

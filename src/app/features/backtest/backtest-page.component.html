@@ -370,9 +370,17 @@
                         [leftLabel]="sides().leftLabel"
                         [rightLabel]="sides().rightLabel"
                         height="fill" />
-                    } @else {
+                    } @else if (chartView() === 'distribution') {
                       <app-trade-histogram
                         [histogram]="histogramAll()"
+                        [visible]="chartSide()"
+                        [label]="chartScope()"
+                        [leftLabel]="sides().leftLabel"
+                        [rightLabel]="sides().rightLabel"
+                        height="fill" />
+                    } @else {
+                      <app-r-curve
+                        [series]="cumulativeAll()"
                         [visible]="chartSide()"
                         [label]="chartScope()"
                         [leftLabel]="sides().leftLabel"
@@ -404,9 +412,17 @@
                             [leftLabel]="sides().leftLabel"
                             [rightLabel]="sides().rightLabel"
                             [height]="180" />
-                        } @else {
+                        } @else if (chartView() === 'distribution') {
                           <app-trade-histogram
                             [histogram]="entry.histogram"
+                            [visible]="chartSide()"
+                            [label]="entry.id"
+                            [leftLabel]="sides().leftLabel"
+                            [rightLabel]="sides().rightLabel"
+                            [height]="180" />
+                        } @else {
+                          <app-r-curve
+                            [series]="entry.cumulative"
                             [visible]="chartSide()"
                             [label]="entry.id"
                             [leftLabel]="sides().leftLabel"

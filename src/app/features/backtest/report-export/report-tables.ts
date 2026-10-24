@@ -5,7 +5,7 @@ import {
 import {
   SplitKey,
   buildComparisonRows,
-  buildMonthlyBars,
+  buildMonthlySeries,
   collectTrades,
   evaluationModeOf,
   exitCountOf,
@@ -224,14 +224,45 @@ export function buildVerdictReasonsTable(
 export function buildMonthlyTable(
   doc: EvaluationDocument,
   strategyId: string,
+  splits: SplitKey[],
 ): ReportTable {
-  const confirm = evaluationModeOf(doc) === 'confirm';
+  return buildMonthlySeriesTable(doc, strategyId, splits, 'pnl');
+}
+
+export function buildMonthlyErTable(
+  doc: EvaluationDocument,
+  strategyId: string,
+  splits: SplitKey[],
+): ReportTable {
+  return buildMonthlySeriesTable(doc, strategyId, splits, 'evR');
+}
+
+function buildMonthlySeriesTable(
+  doc: EvaluationDocument,
+  strategyId: string,
+  splits: SplitKey[],
+  metric: 'pnl' | 'evR',
+): ReportTable {
+  const sideLabel = (split: SplitKey): string => {
+    if (split === 'holdout') return 'Holdout';
+    if (split === 'walkForward' || split === 'oos') return 'OOS';
+    return 'IS';
+  };
+  const value = (raw: number): string =>
+    metric === 'pnl' ? formatNumber(raw, 2) : Number.isFinite(raw) ? formatNumber(raw, 2) : '';
+  const bars = buildMonthlySeries(doc, strategyId, splits, metric);
+  if (splits.length === 1) {
+    return {
+      headers: ['mes', sideLabel(splits[0])],
+      rows: bars.map((bar) => [bar.month, value(bar.left)]),
+    };
+  }
   return {
-    headers: confirm ? ['mes', 'OOS', 'Holdout'] : ['mes', 'IS', 'OOS'],
-    rows: buildMonthlyBars(doc, strategyId).map((bar) => [
+    headers: ['mes', sideLabel(splits[0]), sideLabel(splits[1] as SplitKey)],
+    rows: bars.map((bar) => [
       bar.month,
-      formatNumber(bar.left, 2),
-      formatNumber(bar.right, 2),
+      value(bar.left),
+      value(bar.right),
     ]),
   };
 }

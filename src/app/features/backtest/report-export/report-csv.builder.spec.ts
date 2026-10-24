@@ -92,6 +92,7 @@ describe('buildCsvReport', () => {
       strategyId: 'all',
       tradesSplit: 'train',
       stagesSplit: 'both',
+      monthlySplit: 'both',
     });
 
     expect(csv).toContain(
@@ -112,6 +113,7 @@ describe('buildCsvReport', () => {
       strategyId: 'beta',
       tradesSplit: 'train',
       stagesSplit: 'walkForward',
+      monthlySplit: 'both',
     });
 
     expect(csv).toContain('# result');
@@ -128,12 +130,44 @@ describe('buildCsvReport', () => {
       strategyId: 'all',
       tradesSplit: 'both',
       stagesSplit: 'both',
+      monthlySplit: 'both',
     });
 
     expect(csv).toContain('# result');
     expect(csv).toContain('# result_verdicts');
     expect(csv).not.toContain('# train_summary');
     expect(csv).not.toContain('# trades_train');
+  });
+
+  it('scopes the monthly blocks to the chosen split and exports E[R] per month', () => {
+    const csv = buildCsvReport(doc, 'report.json', {
+      format: 'csv',
+      sections: ['monthly', 'monthlyEr'],
+      strategyId: 'all',
+      tradesSplit: 'both',
+      stagesSplit: 'both',
+      monthlySplit: 'train',
+    });
+
+    expect(csv).toContain('# monthly\nmes,IS');
+    expect(csv).toContain('2025-02,80.00');
+    expect(csv).not.toContain(',OOS');
+    expect(csv).toContain('# monthly_er\nmes,IS');
+    expect(csv).toContain('2025-02,0.25');
+  });
+
+  it('keeps both monthly columns when the scope is both', () => {
+    const csv = buildCsvReport(doc, 'report.json', {
+      format: 'csv',
+      sections: ['monthly'],
+      strategyId: 'all',
+      tradesSplit: 'both',
+      stagesSplit: 'both',
+      monthlySplit: 'both',
+    });
+
+    expect(csv).toContain('# monthly\nmes,IS,OOS');
+    expect(csv).toContain('2025-02,80.00,80.00');
   });
 
   it('uses the csv extension in the filename', () => {

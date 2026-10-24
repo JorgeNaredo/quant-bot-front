@@ -5,6 +5,8 @@ import {
   buildTradeHistogram,
   comparativeKpis,
   comparisonSides,
+  buildCumulativeR,
+  cumulativeCount,
   evLabel,
   histogramTotal,
   deltaText,
@@ -340,6 +342,48 @@ describe('report-data', () => {
     expect(evLabel(-0.001)).toBe('0.00R');
     expect(evLabel(undefined)).toBe('—');
     expect(evLabel(Number.NaN)).toBe('—');
+  });
+
+  it('builds cumulative R per side ordered by exit time', () => {
+    const doc = document('develop');
+    doc.train!.strategies = [
+      strategy('alpha', {
+        trades: [
+          { exitTime: '2026-02-01T00:00:00Z', netR: 1 },
+          { exitTime: '2026-01-02T00:00:00Z', netR: 2 },
+          { exitTime: '2026-01-01T00:00:00Z', netR: -1 },
+          { netR: 5 },
+        ],
+      }),
+    ];
+    doc.walkForward!.strategies = [
+      strategy('alpha', {
+        trades: [{ exitTime: '2026-03-01T00:00:00Z', netR: -0.5 }],
+      }),
+    ];
+    const series = buildCumulativeR(doc, 'alpha');
+    expect(series.left).toEqual([-1, 1, 2]);
+    expect(series.right).toEqual([-0.5]);
+    expect(cumulativeCount(series, 'left')).toBe(3);
+    expect(cumulativeCount(series, 'right')).toBe(1);
+    expect(cumulativeCount(series, 'both')).toBe(4);
+  });
+
+  it('drops trades without a finite net R from the cumulative series', () => {
+    const doc = document('develop');
+    doc.train!.strategies = [
+      strategy('alpha', {
+        trades: [
+          { netR: 1 },
+          { exitTime: '2026-01-05T00:00:00Z', netR: Number.NaN },
+          { netPnl: 10 },
+        ],
+      }),
+    ];
+    doc.walkForward!.strategies = [strategy('alpha', { trades: [] })];
+    const series = buildCumulativeR(doc, 'all');
+    expect(series.left).toEqual([]);
+    expect(series.right).toEqual([]);
   });
 
   it('excludes trades without a finite net R', () => {

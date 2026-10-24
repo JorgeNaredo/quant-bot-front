@@ -349,7 +349,8 @@ select:focus-visible {
 }
 
 .curves__fill app-monthly-chart,
-.curves__fill app-trade-histogram {
+.curves__fill app-trade-histogram,
+.curves__fill app-r-curve {
   flex: 1 1 auto;
   min-height: 0;
 }

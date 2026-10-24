@@ -120,6 +120,7 @@ describe('buildMarkdownReport', () => {
       strategyId: 'all',
       tradesSplit: 'both',
       stagesSplit: 'both',
+      monthlySplit: 'both',
     });
 
     expect(markdown).toContain(
@@ -139,6 +140,7 @@ describe('buildMarkdownReport', () => {
       strategyId: 'all',
       tradesSplit: 'train',
       stagesSplit: 'both',
+      monthlySplit: 'both',
     });
 
     expect(markdown).toContain('```csv');
@@ -156,6 +158,7 @@ describe('buildMarkdownReport', () => {
       strategyId: 'beta',
       tradesSplit: 'train',
       stagesSplit: 'both',
+      monthlySplit: 'both',
     });
 
     expect(markdown).toContain('| beta |');
@@ -171,11 +174,42 @@ describe('buildMarkdownReport', () => {
       strategyId: 'all',
       tradesSplit: 'both',
       stagesSplit: 'both',
+      monthlySplit: 'both',
     });
 
     expect(markdown).toContain('## Resultado');
     expect(markdown).not.toContain('## Train');
     expect(markdown).not.toContain('## Stages');
+  });
+
+  it('renders the monthly tables scoped to the chosen split', () => {
+    const scoped = buildMarkdownReport(doc, 'report.json', {
+      format: 'md',
+      sections: ['monthly', 'monthlyEr'],
+      strategyId: 'all',
+      tradesSplit: 'both',
+      stagesSplit: 'both',
+      monthlySplit: 'train',
+    });
+
+    expect(scoped).toContain('## Ganancias por mes (IS / OOS)');
+    expect(scoped).toContain('| mes | IS |');
+    expect(scoped).toContain('| 2025-02 | 80.00 |');
+    expect(scoped).toContain('## E[R] por mes (IS / OOS)');
+    expect(scoped).toContain('| 2025-02 | 0.25 |');
+    expect(scoped).not.toContain('| OOS |');
+
+    const both = buildMarkdownReport(doc, 'report.json', {
+      format: 'md',
+      sections: ['monthly'],
+      strategyId: 'all',
+      tradesSplit: 'both',
+      stagesSplit: 'both',
+      monthlySplit: 'both',
+    });
+
+    expect(both).toContain('| mes | IS | OOS |');
+    expect(both).toContain('| 2025-02 | 80.00 | 80.00 |');
   });
 });
 

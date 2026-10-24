@@ -51,6 +51,7 @@ export class ReportExportComponent implements OnInit {
   protected readonly strategyId = signal<string>('all');
   protected readonly tradesSplit = signal<SplitScope>('both');
   protected readonly stagesSplit = signal<SplitScope>('both');
+  protected readonly monthlySplit = signal<SplitScope>('both');
   protected readonly strategies = computed(() => strategyOptions(this.evaluation()));
   protected readonly canDownload = computed(() => this.sections().length > 0);
   protected readonly confirmMode = computed(
@@ -66,6 +67,16 @@ export class ReportExportComponent implements OnInit {
   protected readonly confirmSplitOptions: { value: SplitScope; label: string }[] = [
     { value: 'holdout', label: 'Holdout' },
   ];
+  protected readonly monthlySplitOptions: { value: SplitScope; label: string }[] = [
+    { value: 'both', label: 'IS + OOS' },
+    { value: 'train', label: 'Train (IS)' },
+    { value: 'walkForward', label: 'Walk-forward (OOS)' },
+  ];
+  protected readonly monthlyConfirmSplitOptions: { value: SplitScope; label: string }[] = [
+    { value: 'both', label: 'OOS + Holdout' },
+    { value: 'oos', label: 'OOS' },
+    { value: 'holdout', label: 'Holdout' },
+  ];
   protected readonly strategyChoices = computed(() =>
     this.strategies().map((id) => ({ value: id, label: id === 'all' ? 'Todas' : id })),
   );
@@ -76,6 +87,7 @@ export class ReportExportComponent implements OnInit {
     if (evaluationModeOf(doc) === 'confirm') {
       this.tradesSplit.set('holdout');
       this.stagesSplit.set('holdout');
+      this.monthlySplit.set('both');
     }
   }
 
@@ -105,6 +117,7 @@ export class ReportExportComponent implements OnInit {
       strategyId: this.strategyId(),
       tradesSplit: this.tradesSplit(),
       stagesSplit: this.stagesSplit(),
+      monthlySplit: this.monthlySplit(),
     });
     const filename = buildExportFilename(
       this.reportName(),

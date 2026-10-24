@@ -515,22 +515,57 @@ export function buildMonthlyBars(
   strategyId: string,
 ): MonthlyBar[] {
   const sides = comparisonSides(doc);
-  const map = new Map<string, MonthlyBar>();
+  return buildMonthlySeries(doc, strategyId, [sides.left, sides.right], 'pnl');
+}
+
+export type MonthlyMetric = 'pnl' | 'evR';
+
+export function buildMonthlySeries(
+  doc: EvaluationDocument,
+  strategyId: string,
+  splits: SplitKey[],
+  metric: MonthlyMetric,
+): MonthlyBar[] {
+  const map = new Map<string, { left: number; right: number }>();
+  const rows = new Map<string, Partial<Record<'left' | 'right', { sum: number; count: number }>>>();
   const add = (split: SplitKey, key: 'left' | 'right') => {
     for (const strategy of splitStrategies(doc, split)) {
       if (strategyId !== 'all' && strategy.id !== strategyId) continue;
       for (const trade of strategy.trades ?? []) {
         if (!trade.exitTime) continue;
         const month = trade.exitTime.slice(0, 7);
-        const row = map.get(month) ?? { month, left: 0, right: 0 };
-        row[key] += trade.netPnl ?? 0;
-        map.set(month, row);
+        const bars = map.get(month) ?? { left: 0, right: 0 };
+        const perSide = rows.get(month) ?? {};
+        if (perSide[key] === undefined) perSide[key] = { sum: 0, count: 0 };
+        if (metric === 'pnl') {
+          bars[key] += trade.netPnl ?? 0;
+        } else {
+          const r = trade.netR;
+          if (typeof r === 'number' && Number.isFinite(r)) {
+            perSide[key].sum += r;
+            perSide[key].count += 1;
+          }
+        }
+        map.set(month, bars);
+        rows.set(month, perSide);
       }
     }
   };
-  add(sides.left, 'left');
-  add(sides.right, 'right');
-  return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
+  const [first, second] = splits;
+  if (first) add(first, 'left');
+  if (second && second !== first) add(second, 'right');
+  return Array.from(map.entries())
+    .map(([month, bars]) => ({
+      month,
+      left: metric === 'pnl' ? bars.left : average(rows.get(month)?.left),
+      right: metric === 'pnl' ? bars.right : average(rows.get(month)?.right),
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+}
+
+function average(entry?: { sum: number; count: number }): number {
+  if (!entry || entry.count === 0) return Number.NaN;
+  return entry.sum / entry.count;
 }
 
 export function sliceMonthlyBars(bars: MonthlyBar[], side: BarSide): MonthlyBar[] {
@@ -646,6 +681,48 @@ export function histogramTotal(hist: TradeHistogram, side: BarSide): number {
   if (side === 'left') return hist.leftTotal;
   if (side === 'right') return hist.rightTotal;
   return hist.leftTotal + hist.rightTotal;
+}
+
+export interface CumulativeR {
+  left: number[];
+  right: number[];
+}
+
+export const EMPTY_CUMULATIVE_R: CumulativeR = { left: [], right: [] };
+
+function cumulativeSeries(trades: TradeRow[]): number[] {
+  const out: number[] = [];
+  let sum = 0;
+  const sorted = [...trades]
+    .filter(
+      (trade) =>
+        typeof trade.exitTime === 'string' &&
+        typeof trade.netR === 'number' &&
+        Number.isFinite(trade.netR as number),
+    )
+    .sort((a, b) => (a.exitTime ?? '').localeCompare(b.exitTime ?? ''));
+  for (const trade of sorted) {
+    sum += trade.netR as number;
+    out.push(sum);
+  }
+  return out;
+}
+
+export function buildCumulativeR(
+  doc: EvaluationDocument,
+  strategyId: string,
+): CumulativeR {
+  const sides = comparisonSides(doc);
+  return {
+    left: cumulativeSeries(collectTrades(doc, sides.left, strategyId)),
+    right: cumulativeSeries(collectTrades(doc, sides.right, strategyId)),
+  };
+}
+
+export function cumulativeCount(series: CumulativeR, side: BarSide): number {
+  if (side === 'left') return series.left.length;
+  if (side === 'right') return series.right.length;
+  return series.left.length + series.right.length;
 }
 
 export function evLabel(ev: number | undefined | null): string {

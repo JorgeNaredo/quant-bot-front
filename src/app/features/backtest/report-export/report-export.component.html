@@ -100,6 +100,18 @@
           appendTo="body"
           styleClass="export__control" />
       </label>
+
+      <label class="export__field">
+        <span>Split de mes</span>
+        <p-select
+          [options]="confirmMode() ? monthlyConfirmSplitOptions : monthlySplitOptions"
+          optionLabel="label"
+          optionValue="value"
+          [ngModel]="monthlySplit()"
+          (ngModelChange)="monthlySplit.set($event)"
+          appendTo="body"
+          styleClass="export__control" />
+      </label>
     </div>
   </div>
 
