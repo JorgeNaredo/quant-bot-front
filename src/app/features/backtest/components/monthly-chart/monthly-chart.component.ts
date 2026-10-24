@@ -16,20 +16,24 @@ import {
   BarElement,
   CategoryScale,
   Chart,
+  ChartDataset,
   LinearScale,
   Tooltip,
 } from 'chart.js';
-import { MonthlyBar } from '../../report-data';
+import { BarSide, MonthlyBar, sliceMonthlyBars } from '../../report-data';
+import {
+  CHART_GRID,
+  CHART_TOOLTIP_BG,
+  CHART_TOOLTIP_BORDER,
+  CHART_TOOLTIP_MUTED,
+  CHART_TOOLTIP_TEXT,
+  chartToken,
+} from '../chart-theme';
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip);
 
 const NEGATIVE_LEFT = '#365fa8';
 const NEGATIVE_RIGHT = '#3f7a55';
-const TOOLTIP_BG = '#182033';
-const TOOLTIP_BORDER = '#263145';
-const TOOLTIP_TEXT = '#e8edf5';
-const TOOLTIP_MUTED = '#94a3b8';
-const GRID = 'rgba(38, 49, 69, 0.55)';
 
 const money = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -48,10 +52,11 @@ const monthFormat = new Intl.DateTimeFormat('es', {
 @Component({
   selector: 'app-monthly-chart',
   standalone: true,
+  host: { '[class.chart-fill]': 'height() === \'fill\'' },
   template: `
-    <div class="chart">
+    <div class="chart" [class.chart--fill]="height() === 'fill'" [style.height.px]="heightPx()">
       <canvas #canvas role="img" [attr.aria-label]="ariaLabel()"></canvas>
-      @if (!bars().length) {
+      @if (!hasData()) {
         <p class="chart__empty">Sin operaciones cerradas.</p>
       }
     </div>
@@ -63,29 +68,48 @@ export class MonthlyChartComponent implements OnDestroy {
   readonly bars = input.required<MonthlyBar[]>();
   readonly leftLabel = input<string>('IS');
   readonly rightLabel = input<string>('OOS');
+  readonly visible = input<BarSide>('both');
+  readonly height = input<number | 'fill'>(260);
+  readonly label = input<string>('');
 
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
   private readonly injector = inject(Injector);
   private chart: Chart<'bar', number[], string> | null = null;
 
-  protected readonly ariaLabel = computed(
-    () =>
-      `Ganancias mensuales de ${this.leftLabel()} y ${this.rightLabel()}`
-      + ` en ${this.bars().length} meses`,
-  );
+  protected readonly shown = computed(() => sliceMonthlyBars(this.bars(), this.visible()));
 
-  private readonly leftColor = this.token('--primary', '#4c8dff');
-  private readonly rightColor = this.token('--success', '#22c55e');
-  private readonly tickColor = this.token('--text-color-muted', '#64748b');
+  protected readonly hasData = computed(() => this.shown().length > 0);
+
+  protected readonly heightPx = computed(() => {
+    const height = this.height();
+    return height === 'fill' ? null : height;
+  });
+
+  protected readonly ariaLabel = computed(() => {
+    const scope = this.label() ? `${this.label()}: ` : '';
+    const visible = this.visible();
+    const sides =
+      visible === 'both'
+        ? `${this.leftLabel()} y ${this.rightLabel()}`
+        : visible === 'left'
+          ? this.leftLabel()
+          : this.rightLabel();
+    return `${scope}ganancias mensuales de ${sides} en ${this.shown().length} meses`;
+  });
+
+  private readonly leftColor = chartToken('--primary', '#4c8dff');
+  private readonly rightColor = chartToken('--success', '#22c55e');
+  private readonly tickColor = chartToken('--text-color-muted', '#64748b');
 
   constructor() {
     afterNextRender(() => this.createChart(), { injector: this.injector });
     effect(() => {
-      const bars = this.bars();
+      const bars = this.shown();
       const left = this.leftLabel();
       const right = this.rightLabel();
+      const visible = this.visible();
       if (!this.chart) return;
-      this.applyData(bars, left, right);
+      this.applyData(bars, left, right, visible);
     });
   }
 
@@ -108,11 +132,11 @@ export class MonthlyChartComponent implements OnDestroy {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: TOOLTIP_BG,
-            borderColor: TOOLTIP_BORDER,
+            backgroundColor: CHART_TOOLTIP_BG,
+            borderColor: CHART_TOOLTIP_BORDER,
             borderWidth: 1,
-            titleColor: TOOLTIP_TEXT,
-            bodyColor: TOOLTIP_MUTED,
+            titleColor: CHART_TOOLTIP_TEXT,
+            bodyColor: CHART_TOOLTIP_MUTED,
             padding: 8,
             displayColors: true,
             callbacks: {
@@ -123,7 +147,7 @@ export class MonthlyChartComponent implements OnDestroy {
         scales: {
           x: {
             grid: { display: false },
-            border: { color: GRID },
+            border: { color: CHART_GRID },
             ticks: {
               color: this.tickColor,
               font: { size: 10 },
@@ -133,7 +157,7 @@ export class MonthlyChartComponent implements OnDestroy {
           },
           y: {
             position: 'right',
-            grid: { color: GRID },
+            grid: { color: CHART_GRID },
             border: { display: false },
             ticks: {
               color: this.tickColor,
@@ -144,28 +168,42 @@ export class MonthlyChartComponent implements OnDestroy {
         },
       },
     });
-    this.applyData(this.bars(), this.leftLabel(), this.rightLabel());
+    this.applyData(
+      this.shown(),
+      this.leftLabel(),
+      this.rightLabel(),
+      this.visible(),
+    );
   }
 
-  private applyData(bars: MonthlyBar[], left: string, right: string): void {
+  private applyData(
+    bars: MonthlyBar[],
+    left: string,
+    right: string,
+    visible: BarSide,
+  ): void {
     if (!this.chart) return;
     this.chart.data.labels = bars.map((bar) => this.monthLabel(bar.month));
-    this.chart.data.datasets = [
-      {
+    const datasets: ChartDataset<'bar', number[]>[] = [];
+    if (visible !== 'right') {
+      datasets.push({
         label: left,
         data: bars.map((bar) => bar.left),
         backgroundColor: bars.map((bar) => (bar.left >= 0 ? this.leftColor : NEGATIVE_LEFT)),
         borderRadius: 2,
         maxBarThickness: 18,
-      },
-      {
+      });
+    }
+    if (visible !== 'left') {
+      datasets.push({
         label: right,
         data: bars.map((bar) => bar.right),
         backgroundColor: bars.map((bar) => (bar.right >= 0 ? this.rightColor : NEGATIVE_RIGHT)),
         borderRadius: 2,
         maxBarThickness: 18,
-      },
-    ];
+      });
+    }
+    this.chart.data.datasets = datasets;
     this.chart.update();
   }
 
@@ -175,9 +213,5 @@ export class MonthlyChartComponent implements OnDestroy {
     return monthFormat.format(date);
   }
 
-  private token(name: string, fallback: string): string {
-    if (typeof document === 'undefined') return fallback;
-    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    return value || fallback;
-  }
+
 }

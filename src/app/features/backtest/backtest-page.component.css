@@ -242,6 +242,118 @@ select:focus-visible {
   color: var(--text-color-muted);
 }
 
+.pane__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.curves {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.curves--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.curves__all {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.5rem 0.6rem 0.4rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+}
+
+.curves--single .curves__all {
+  grid-column: 1;
+  height: auto;
+}
+
+.curves--single .curves__fill {
+  flex: 0 0 auto;
+  height: 260px;
+}
+
+.curves__individuals {
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-content: start;
+  min-width: 0;
+}
+
+.curves__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.5rem 0.6rem 0.4rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+}
+
+.curves__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.curves__head h4 {
+  min-width: 0;
+}
+
+.curves__ev {
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  color: var(--text-color-muted);
+  white-space: nowrap;
+}
+
+.curves__ev.is-pos {
+  color: var(--success);
+}
+
+.curves__ev.is-neg {
+  color: var(--danger);
+}
+
+.curves__head h4 {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.curves__fill {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.curves__fill app-monthly-chart,
+.curves__fill app-trade-histogram {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 :host ::ng-deep .bt-accordion {
   margin-top: var(--space-1);
 }
@@ -271,22 +383,27 @@ select:focus-visible {
 .bt__legend {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-3);
   margin: 0;
   color: var(--text-color-secondary);
   font-size: 0.74rem;
+}
+
+.bt__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.bt__legend-item.is-muted {
+  opacity: 0.35;
 }
 
 .swatch {
   display: inline-block;
   width: 10px;
   height: 10px;
-  margin-left: var(--space-2);
   border-radius: 2px;
-}
-
-.bt__legend .swatch:first-child {
-  margin-left: 0;
 }
 
 .swatch--left {
@@ -364,6 +481,34 @@ select:focus-visible {
 .bt__empty p {
   margin: 0;
   font-size: 0.82rem;
+}
+
+@media (max-width: 1100px) {
+  .curves {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .curves__all {
+    grid-column: 1;
+    grid-row: 1;
+    height: auto;
+  }
+
+  .curves__individuals {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .curves__fill {
+    flex: 0 0 auto;
+    height: 260px;
+  }
+}
+
+@media (max-width: 760px) {
+  .curves__individuals {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 900px) {

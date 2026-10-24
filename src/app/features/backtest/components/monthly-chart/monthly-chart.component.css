@@ -2,9 +2,21 @@
   display: block;
 }
 
+:host(.chart-fill) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .chart {
   position: relative;
   height: 260px;
+}
+
+.chart--fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .chart canvas {

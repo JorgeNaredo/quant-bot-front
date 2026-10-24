@@ -2,13 +2,17 @@ import { EvaluationDocument, StrategyReport } from '../../shared/models/bot-api.
 import {
   buildComparativeRows,
   buildMonthlyBars,
+  buildTradeHistogram,
   comparativeKpis,
   comparisonSides,
+  evLabel,
+  histogramTotal,
   deltaText,
   evaluationModeOf,
   floorTone,
   gradeSeverity,
   orderedStrategyIds,
+  sliceMonthlyBars,
   sortComparativeRows,
   verdictRank,
   verdictSeverity,
@@ -258,6 +262,120 @@ describe('report-data', () => {
       { month: '2026-01', left: 10, right: 25 },
       { month: '2026-02', left: 0, right: -5 },
     ]);
+  });
+
+  it('slices monthly bars to the visible split', () => {
+    const bars = [
+      { month: '2026-01', left: 10, right: 0 },
+      { month: '2026-02', left: 0, right: 0 },
+      { month: '2026-03', left: 3, right: 0 },
+      { month: '2026-04', left: 0, right: 5 },
+      { month: '2026-05', left: 0, right: -5 },
+    ];
+    expect(sliceMonthlyBars(bars, 'both')).toBe(bars);
+    expect(sliceMonthlyBars(bars, 'left').map((bar) => bar.month)).toEqual([
+      '2026-01',
+      '2026-02',
+      '2026-03',
+    ]);
+    expect(sliceMonthlyBars(bars, 'right').map((bar) => bar.month)).toEqual([
+      '2026-04',
+      '2026-05',
+    ]);
+    expect(sliceMonthlyBars(bars, 'right')).not.toBe(bars);
+  });
+
+  it('drops monthly bars when the visible split has no data', () => {
+    const bars = [{ month: '2026-01', left: 10, right: 0 }];
+    expect(sliceMonthlyBars(bars, 'right')).toEqual([]);
+    expect(sliceMonthlyBars([], 'left')).toEqual([]);
+  });
+
+  it('buckets trades by net R for each compared side', () => {
+    const doc = document('develop');
+    doc.train!.strategies = [
+      strategy('alpha', {
+        trades: [
+          { netR: -1.1 },
+          { netR: 1.95 },
+          { netR: -1 },
+          { netR: 2 },
+          { netR: 3 },
+          { netR: 2.7 },
+          { netR: -2.5 },
+        ],
+      }),
+      strategy('beta', { trades: [{ netR: 0.3 }] }),
+    ];
+    doc.walkForward!.strategies = [
+      strategy('alpha', { trades: [{ netR: 0.3 }] }),
+    ];
+    const hist = buildTradeHistogram(doc, 'alpha');
+    expect(hist.bins.length).toBe(13);
+    expect(hist.leftTotal).toBe(7);
+    expect(hist.rightTotal).toBe(1);
+    const countLeft = (edge: number | null) =>
+      hist.bins.find((bin) => bin.edge === edge)?.left ?? 0;
+    expect(countLeft(null)).toBe(0);
+    expect(countLeft(-2.5)).toBe(1);
+    expect(countLeft(-1.5)).toBe(1);
+    expect(countLeft(-1)).toBe(1);
+    expect(countLeft(0)).toBe(0);
+    expect(countLeft(1.5)).toBe(1);
+    expect(countLeft(2)).toBe(1);
+    expect(countLeft(2.5)).toBe(1);
+    expect(hist.bins[0].left).toBe(0);
+    expect(hist.bins[12].left).toBe(1);
+    expect(hist.bins[12].label).toBe('≥ 3.00');
+    expect(hist.bins[0].label).toBe('< -2.50');
+    expect(hist.bins[6].label).toBe('0.00 a 0.50');
+    expect(hist.leftEv).toBeCloseTo(5.05 / 7, 5);
+    expect(hist.rightEv).toBeCloseTo(0.3, 5);
+  });
+
+  it('formats the expectancy chip label', () => {
+    expect(evLabel(0.08)).toBe('+0.08R');
+    expect(evLabel(-0.03)).toBe('-0.03R');
+    expect(evLabel(0)).toBe('0.00R');
+    expect(evLabel(-0.001)).toBe('0.00R');
+    expect(evLabel(undefined)).toBe('—');
+    expect(evLabel(Number.NaN)).toBe('—');
+  });
+
+  it('excludes trades without a finite net R', () => {
+    const doc = document('develop');
+    doc.train!.strategies = [
+      strategy('alpha', {
+        trades: [{ netR: 1 }, { netPnl: 5 }, { netR: Number.NaN }],
+      }),
+    ];
+    doc.walkForward!.strategies = [strategy('alpha', { trades: [] })];
+    const hist = buildTradeHistogram(doc, 'all');
+    expect(hist.leftTotal).toBe(1);
+    expect(hist.rightTotal).toBe(0);
+    expect(hist.leftEv).toBe(1);
+    expect(hist.rightEv).toBeUndefined();
+    expect(histogramTotal(hist, 'left')).toBe(1);
+    expect(histogramTotal(hist, 'right')).toBe(0);
+    expect(histogramTotal(hist, 'both')).toBe(1);
+  });
+
+  it('maps confirm mode splits to left and right', () => {
+    const doc = document('confirm');
+    doc.oos = { strategies: [strategy('alpha', { trades: [{ netR: 1 }] })] };
+    doc.holdout = {
+      strategies: [strategy('alpha', { trades: [{ netR: -1 }, { netR: 2 }] })],
+    };
+    const hist = buildTradeHistogram(doc, 'all');
+    expect(hist.leftTotal).toBe(1);
+    expect(hist.rightTotal).toBe(2);
+  });
+
+  it('returns empty totals for documents without trades', () => {
+    const hist = buildTradeHistogram(document('develop'), 'all');
+    expect(hist.leftTotal).toBe(0);
+    expect(hist.rightTotal).toBe(0);
+    expect(hist.bins.every((bin) => bin.left === 0 && bin.right === 0)).toBe(true);
   });
 
   it('formats deltas with direction arrows', () => {

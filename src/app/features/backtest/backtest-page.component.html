@@ -311,21 +311,113 @@
           <p-tabpanel value="curves">
             <div class="pane">
               <div class="pane__bar">
-                <h3>Ganancias por mes</h3>
-                <p class="bt__legend">
-                  <span class="swatch swatch--left"></span>{{ sides().leftFullLabel }}
-                  <span class="swatch swatch--right"></span>{{ sides().rightFullLabel }}
-                </p>
+                <h3>{{ curveTitle() }}</h3>
+                <div class="pane__controls">
+                  <p-selectbutton
+                    size="small"
+                    [options]="chartViewOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    [allowEmpty]="false"
+                    aria-label="Tipo de gráfico"
+                    [ngModel]="chartView()"
+                    (ngModelChange)="chartView.set($event)" />
+                  <p-selectbutton
+                    size="small"
+                    [options]="chartSideOptions()"
+                    optionLabel="label"
+                    optionValue="value"
+                    [allowEmpty]="false"
+                    [ngModel]="chartSide()"
+                    (ngModelChange)="chartSide.set($event)" />
+                  <p class="bt__legend">
+                    <span
+                      class="bt__legend-item"
+                      [class.is-muted]="chartSide() === 'right'">
+                      <span class="swatch swatch--left"></span>{{ sides().leftFullLabel }}
+                    </span>
+                    <span
+                      class="bt__legend-item"
+                      [class.is-muted]="chartSide() === 'left'">
+                      <span class="swatch swatch--right"></span>{{ sides().rightFullLabel }}
+                    </span>
+                  </p>
+                </div>
               </div>
               <div class="bt__run-line">
                 <span class="mono">{{ runMeta('left') }}</span>
                 <span class="mono">{{ runMeta('right') }}</span>
               </div>
-              <app-monthly-chart
-                [bars]="monthly()"
-                [leftLabel]="sides().leftLabel"
-                [rightLabel]="sides().rightLabel"
-              />
+
+              <div class="curves" [class.curves--single]="selectedStrategy() !== 'all'">
+                <article class="curves__all">
+                  <header class="curves__head">
+                    <h4 class="mono" [title]="chartScope()">{{ chartScope() }}</h4>
+                    <span
+                      class="curves__ev mono"
+                      [title]="evTitle(histogramAll())"
+                      [class.is-pos]="evTone(histogramAll()) === 'pos'"
+                      [class.is-neg]="evTone(histogramAll()) === 'neg'">
+                      {{ evLabel(curvesEv(histogramAll())) }}
+                    </span>
+                  </header>
+                  <div class="curves__fill">
+                    @if (chartView() === 'monthly') {
+                      <app-monthly-chart
+                        [bars]="monthlyAll()"
+                        [visible]="chartSide()"
+                        [label]="chartScope()"
+                        [leftLabel]="sides().leftLabel"
+                        [rightLabel]="sides().rightLabel"
+                        height="fill" />
+                    } @else {
+                      <app-trade-histogram
+                        [histogram]="histogramAll()"
+                        [visible]="chartSide()"
+                        [label]="chartScope()"
+                        [leftLabel]="sides().leftLabel"
+                        [rightLabel]="sides().rightLabel"
+                        height="fill" />
+                    }
+                  </div>
+                </article>
+
+                @if (selectedStrategy() === 'all') {
+                  <div class="curves__individuals">
+                    @for (entry of chartStrategies(); track entry.id) {
+                      <article class="curves__card">
+                        <header class="curves__head">
+                          <h4 class="mono" [title]="entry.id">{{ entry.id }}</h4>
+                          <span
+                            class="curves__ev mono"
+                            [title]="evTitle(entry.histogram)"
+                            [class.is-pos]="evTone(entry.histogram) === 'pos'"
+                            [class.is-neg]="evTone(entry.histogram) === 'neg'">
+                            {{ evLabel(curvesEv(entry.histogram)) }}
+                          </span>
+                        </header>
+                        @if (chartView() === 'monthly') {
+                          <app-monthly-chart
+                            [bars]="entry.bars"
+                            [visible]="chartSide()"
+                            [label]="entry.id"
+                            [leftLabel]="sides().leftLabel"
+                            [rightLabel]="sides().rightLabel"
+                            [height]="180" />
+                        } @else {
+                          <app-trade-histogram
+                            [histogram]="entry.histogram"
+                            [visible]="chartSide()"
+                            [label]="entry.id"
+                            [leftLabel]="sides().leftLabel"
+                            [rightLabel]="sides().rightLabel"
+                            [height]="180" />
+                        }
+                      </article>
+                    }
+                  </div>
+                }
+              </div>
             </div>
           </p-tabpanel>
         </p-tabpanels>

@@ -25,16 +25,24 @@ import {
 import { BotApiService } from '../../shared/services/bot-api.service';
 import { SessionStoreService } from '../../shared/services/session-store.service';
 import {
+  BarSide,
   ComparativeSort,
   MonthlyBar,
   SplitKey,
+  TradeHistogram,
   buildComparativeRows,
   buildMonthlyBars,
+  buildTradeHistogram,
   collectTrades,
   comparativeKpis,
   comparisonSides,
+  EMPTY_HISTOGRAM,
+  evLabel,
   filterByStrategy,
   formatRunHeader,
+  histogramTotal,
+  orderedStrategyIds,
+  sliceMonthlyBars,
   sortComparativeRows,
   splitStrategies,
   strategyOptions,
@@ -44,8 +52,10 @@ import { ComparisonSummariesComponent } from './components/comparison-summaries/
 import { ComparativeKpisComponent } from './components/comparative-kpis/comparative-kpis.component';
 import { MonthlyChartComponent } from './components/monthly-chart/monthly-chart.component';
 import { StrategyDetailsComponent } from './components/strategy-details/strategy-details.component';
+import { TradeHistogramComponent } from './components/trade-histogram/trade-histogram.component';
 
 type DetailTab = 'strategies' | 'trades' | 'stages' | 'curves';
+type ChartView = 'monthly' | 'distribution';
 
 @Component({
   selector: 'app-backtest-page',
@@ -63,6 +73,7 @@ type DetailTab = 'strategies' | 'trades' | 'stages' | 'curves';
     TagModule,
     StrategyDetailsComponent,
     ComparisonSummariesComponent,
+    TradeHistogramComponent,
     ComparativeKpisComponent,
     MonthlyChartComponent,
   ],
@@ -86,6 +97,8 @@ export class BacktestPageComponent implements AfterViewInit {
   protected readonly profileOutcome = signal<SymbolOutcome | null>(null);
   protected readonly reachabilityOutcome = signal<SpecReachabilityOutcome | null>(null);
   protected readonly selectedStrategy = signal<string>('all');
+  protected readonly chartSide = signal<BarSide>('both');
+  protected readonly chartView = signal<ChartView>('monthly');
   protected readonly comparativeSort = signal<ComparativeSort>('verdict');
   protected readonly detailSplit = signal<SplitKey>('train');
   protected readonly activeTab = signal<DetailTab>('strategies');
@@ -132,10 +145,83 @@ export class BacktestPageComponent implements AfterViewInit {
     return doc ? collectTrades(doc, this.detailSplit(), this.selectedStrategy()) : [];
   });
 
-  protected readonly monthly = computed<MonthlyBar[]>(() => {
+  protected readonly monthlyAll = computed<MonthlyBar[]>(() => {
     const doc = this.evaluation();
     return doc ? buildMonthlyBars(doc, this.selectedStrategy()) : [];
   });
+
+  protected readonly histogramAll = computed<TradeHistogram>(() => {
+    const doc = this.evaluation();
+    return doc ? buildTradeHistogram(doc, this.selectedStrategy()) : EMPTY_HISTOGRAM;
+  });
+
+  protected readonly chartViewOptions = [
+    { label: 'Mensual', value: 'monthly' as ChartView },
+    { label: 'Distribución', value: 'distribution' as ChartView },
+  ];
+
+  protected readonly curveTitle = computed(() =>
+    this.chartView() === 'monthly' ? 'Ganancias por mes' : 'Distribución de R por operación',
+  );
+
+  protected readonly chartStrategies = computed<
+    { id: string; bars: MonthlyBar[]; histogram: TradeHistogram }[]
+  >(() => {
+    const doc = this.evaluation();
+    if (!doc) return [];
+    const ids =
+      this.selectedStrategy() === 'all'
+        ? [...orderedStrategyIds(doc)].sort()
+        : [this.selectedStrategy()];
+    const visible = this.chartSide();
+    const view = this.chartView();
+    return ids
+      .map((id) => ({
+        id,
+        bars: buildMonthlyBars(doc, id),
+        histogram: buildTradeHistogram(doc, id),
+      }))
+      .filter((entry) =>
+        view === 'monthly'
+          ? sliceMonthlyBars(entry.bars, visible).length > 0
+          : histogramTotal(entry.histogram, visible) > 0,
+      );
+  });
+
+  protected readonly chartSideOptions = computed(() => {
+    const sides = this.sides();
+    return [
+      { label: `${sides.leftLabel} + ${sides.rightLabel}`, value: 'both' as BarSide },
+      { label: sides.leftLabel, value: 'left' as BarSide },
+      { label: sides.rightLabel, value: 'right' as BarSide },
+    ];
+  });
+
+  protected readonly chartScope = computed(() => {
+    const id = this.selectedStrategy();
+    return id === 'all' ? 'Todas las estrategias' : id;
+  });
+
+  protected readonly evLabel = evLabel;
+
+  protected curvesEv(hist: TradeHistogram): number | undefined {
+    const side = this.chartSide();
+    if (side === 'left') return hist.leftEv;
+    if (side === 'right') return hist.rightEv;
+    return hist.rightEv ?? hist.leftEv;
+  }
+
+  protected evTone(hist: TradeHistogram): 'pos' | 'neg' | 'na' {
+    const ev = this.curvesEv(hist);
+    if (typeof ev !== 'number' || !Number.isFinite(ev)) return 'na';
+    if (ev > 0) return 'pos';
+    if (ev < 0) return 'neg';
+    return 'na';
+  }
+
+  protected evTitle(hist: TradeHistogram): string {
+    return `EV ${this.sides().leftLabel} ${evLabel(hist.leftEv)} · EV ${this.sides().rightLabel} ${evLabel(hist.rightEv)}`;
+  }
 
   ngAfterViewInit(): void {
     if (!this.session()) {

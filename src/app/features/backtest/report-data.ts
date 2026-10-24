@@ -24,6 +24,8 @@ export interface MonthlyBar {
   right: number;
 }
 
+export type BarSide = 'both' | 'left' | 'right';
+
 export interface ComparisonSides {
   mode: EvaluationMode;
   left: SplitKey;
@@ -529,4 +531,130 @@ export function buildMonthlyBars(
   add(sides.left, 'left');
   add(sides.right, 'right');
   return Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export function sliceMonthlyBars(bars: MonthlyBar[], side: BarSide): MonthlyBar[] {
+  if (side === 'both' || bars.length === 0) {
+    return bars;
+  }
+  const first = bars.findIndex((bar) => bar[side] !== 0);
+  if (first < 0) {
+    return [];
+  }
+  let last = bars.length - 1;
+  while (last > first && bars[last][side] === 0) {
+    last -= 1;
+  }
+  return bars.slice(first, last + 1);
+}
+
+export const HISTOGRAM_STEP = 0.5;
+export const HISTOGRAM_MIN = -2.5;
+export const HISTOGRAM_MAX = 3;
+
+export interface HistogramBin {
+  label: string;
+  edge: number | null;
+  left: number;
+  right: number;
+}
+
+export interface TradeHistogram {
+  bins: HistogramBin[];
+  leftTotal: number;
+  rightTotal: number;
+  leftEv?: number;
+  rightEv?: number;
+}
+
+export const EMPTY_HISTOGRAM: TradeHistogram = {
+  bins: [],
+  leftTotal: 0,
+  rightTotal: 0,
+};
+
+const histogramFormat = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+const HISTOGRAM_REGULAR_BINS = Math.round((HISTOGRAM_MAX - HISTOGRAM_MIN) / HISTOGRAM_STEP);
+
+function histogramBinLabel(edge: number): string {
+  const from = histogramFormat.format(edge);
+  const to = histogramFormat.format(edge + HISTOGRAM_STEP);
+  return `${from} a ${to}`;
+}
+
+export function histogramBinLabels(): string[] {
+  const underflow = `< ${histogramFormat.format(HISTOGRAM_MIN)}`;
+  const regular = Array.from({ length: HISTOGRAM_REGULAR_BINS }, (_, index) =>
+    histogramBinLabel(HISTOGRAM_MIN + index * HISTOGRAM_STEP),
+  );
+  const overflow = `≥ ${histogramFormat.format(HISTOGRAM_MAX)}`;
+  return [underflow, ...regular, overflow];
+}
+
+function histogramEdgeOf(index: number): number | null {
+  if (index === 0 || index === HISTOGRAM_REGULAR_BINS + 1) {
+    return null;
+  }
+  return HISTOGRAM_MIN + (index - 1) * HISTOGRAM_STEP;
+}
+
+function histogramBucketOf(r: number): number {
+  if (r < HISTOGRAM_MIN) return 0;
+  if (r >= HISTOGRAM_MAX) return HISTOGRAM_REGULAR_BINS + 1;
+  return 1 + Math.floor((r - HISTOGRAM_MIN) / HISTOGRAM_STEP + 1e-9);
+}
+
+export function buildTradeHistogram(
+  doc: EvaluationDocument,
+  strategyId: string,
+): TradeHistogram {
+  const sides = comparisonSides(doc);
+  const labels = histogramBinLabels();
+  const bins: HistogramBin[] = labels.map((label, index) => ({
+    label,
+    edge: histogramEdgeOf(index),
+    left: 0,
+    right: 0,
+  }));
+  const totals = { left: 0, right: 0 };
+  const sums = { left: 0, right: 0 };
+  const add = (split: SplitKey, key: 'left' | 'right') => {
+    for (const trade of collectTrades(doc, split, strategyId)) {
+      const r = trade.netR;
+      if (typeof r !== 'number' || !Number.isFinite(r)) continue;
+      bins[histogramBucketOf(r)][key] += 1;
+      totals[key] += 1;
+      sums[key] += r;
+    }
+  };
+  add(sides.left, 'left');
+  add(sides.right, 'right');
+  return {
+    bins,
+    leftTotal: totals.left,
+    rightTotal: totals.right,
+    leftEv: totals.left ? sums.left / totals.left : undefined,
+    rightEv: totals.right ? sums.right / totals.right : undefined,
+  };
+}
+
+export function histogramTotal(hist: TradeHistogram, side: BarSide): number {
+  if (side === 'left') return hist.leftTotal;
+  if (side === 'right') return hist.rightTotal;
+  return hist.leftTotal + hist.rightTotal;
+}
+
+export function evLabel(ev: number | undefined | null): string {
+  if (typeof ev !== 'number' || !Number.isFinite(ev)) {
+    return '—';
+  }
+  const text = ev.toFixed(2);
+  if (text === '0.00' || text === '-0.00') {
+    return '0.00R';
+  }
+  return `${ev > 0 ? '+' : ''}${text}R`;
 }
