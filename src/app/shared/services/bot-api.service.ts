@@ -43,6 +43,28 @@ export class BotApiService {
     );
   }
 
+  exportAudit(
+    reportName: string,
+    params: {
+      split?: string;
+      strategy?: string;
+      fromMonth?: string;
+      toMonth?: string;
+      format?: 'jsonl' | 'csv';
+    },
+  ): Observable<Blob> {
+    const query: Record<string, string> = {};
+    if (params.split) query['split'] = params.split;
+    if (params.strategy) query['strategy'] = params.strategy;
+    if (params.fromMonth) query['fromMonth'] = params.fromMonth;
+    if (params.toMonth) query['toMonth'] = params.toMonth;
+    if (params.format) query['format'] = params.format;
+    return this.http.get(
+      `${this.config.url}/cc/reports/${encodeURIComponent(reportName)}/audit`,
+      { params: query, responseType: 'blob' },
+    );
+  }
+
   catalogProfile(symbols: string[]): Observable<ProfileReport> {
     return this.http.post<ProfileReport>(
       `${this.config.url}/backtest/analysis/catalog-profile`,

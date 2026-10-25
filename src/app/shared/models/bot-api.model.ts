@@ -111,6 +111,10 @@ export interface ReportEntry {
 
 export type EvaluationMode = 'develop' | 'confirm';
 
+export interface EvaluationAuditRef {
+  file?: string;
+}
+
 export interface EvaluationDocument {
   evaluation?: {
     symbol?: string;
@@ -128,6 +132,7 @@ export interface EvaluationDocument {
     trainTo?: string;
     walkForwardFrom?: string;
     walkForwardTo?: string;
+    audit?: EvaluationAuditRef;
   };
   train?: SplitDocument;
   walkForward?: SplitDocument;

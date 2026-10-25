@@ -113,6 +113,86 @@
           styleClass="export__control" />
       </label>
     </div>
+
+    @if (hasAudit()) {
+      <fieldset class="export__sections">
+        <legend>Auditoría de setups</legend>
+        <p class="export__audit-hint">
+          Eventos de stage (PASS / WAIT / TIMEOUT / INVALIDATE / ENTER) con features
+          usadas por cada spec. Vacío = todas las estrategias / todo el rango.
+        </p>
+        <div class="export__grid">
+          <label class="export__field">
+            <span>Splits</span>
+            <p-multiSelect
+              [options]="auditSplitChoices()"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="auditSplits()"
+              (ngModelChange)="auditSplits.set($event)"
+              placeholder="Todos"
+              appendTo="body"
+              styleClass="export__control"
+              display="chip" />
+          </label>
+          <label class="export__field">
+            <span>Estrategias</span>
+            <p-multiSelect
+              [options]="auditStrategyChoices()"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="auditStrategies()"
+              (ngModelChange)="auditStrategies.set($event)"
+              placeholder="Todas"
+              appendTo="body"
+              styleClass="export__control"
+              display="chip"
+              [filter]="true" />
+          </label>
+          <label class="export__field">
+            <span>Desde mes (UTC)</span>
+            <input
+              pInputText
+              class="export__control"
+              placeholder="yyyy-MM"
+              [ngModel]="auditFromMonth()"
+              (ngModelChange)="auditFromMonth.set($event)" />
+          </label>
+          <label class="export__field">
+            <span>Hasta mes (UTC)</span>
+            <input
+              pInputText
+              class="export__control"
+              placeholder="yyyy-MM"
+              [ngModel]="auditToMonth()"
+              (ngModelChange)="auditToMonth.set($event)" />
+          </label>
+          <label class="export__field">
+            <span>Formato auditoría</span>
+            <p-select
+              [options]="auditFormats"
+              optionLabel="label"
+              optionValue="value"
+              [ngModel]="auditFormat()"
+              (ngModelChange)="auditFormat.set($event)"
+              appendTo="body"
+              styleClass="export__control" />
+          </label>
+        </div>
+        @if (auditError()) {
+          <p class="export__audit-error">{{ auditError() }}</p>
+        }
+        <div class="export__audit-actions">
+          <p-button
+            [label]="auditBusy() ? 'Exportando…' : 'Descargar auditoría'"
+            severity="secondary"
+            [outlined]="true"
+            [loading]="auditBusy()"
+            [disabled]="auditBusy()"
+            (onClick)="downloadAudit()" />
+        </div>
+      </fieldset>
+    }
   </div>
 
   <ng-template pTemplate="footer">

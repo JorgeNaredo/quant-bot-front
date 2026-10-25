@@ -3,6 +3,7 @@ import {
   Component,
   OnInit,
   computed,
+  inject,
   input,
   output,
   signal,
@@ -11,9 +12,12 @@ import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
+import { InputTextModule } from 'primeng/inputtext';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
 import { EvaluationDocument } from '../../../shared/models/bot-api.model';
-import { downloadTextFile } from '../../../shared/utils/download-file';
+import { BotApiService } from '../../../shared/services/bot-api.service';
+import { downloadBlob, downloadTextFile } from '../../../shared/utils/download-file';
 import { evaluationModeOf, strategyOptions } from '../report-data';
 import {
   buildExportFilename,
@@ -31,12 +35,22 @@ import {
 @Component({
   selector: 'app-report-export',
   standalone: true,
-  imports: [FormsModule, ButtonModule, CheckboxModule, DialogModule, SelectModule],
+  imports: [
+    FormsModule,
+    ButtonModule,
+    CheckboxModule,
+    DialogModule,
+    InputTextModule,
+    MultiSelectModule,
+    SelectModule,
+  ],
   templateUrl: './report-export.component.html',
   styleUrl: './report-export.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ReportExportComponent implements OnInit {
+  private readonly api = inject(BotApiService);
+
   readonly evaluation = input.required<EvaluationDocument>();
   readonly reportName = input.required<string>();
   readonly closed = output<void>();
@@ -58,6 +72,37 @@ export class ReportExportComponent implements OnInit {
     () => evaluationModeOf(this.evaluation()) === 'confirm',
   );
   protected readonly sectionsCatalog = computed(() => sectionsForDocument(this.evaluation()));
+  protected readonly hasAudit = computed(
+    () => !!this.evaluation().evaluation?.audit?.file,
+  );
+  protected readonly auditFormats: { value: 'jsonl' | 'csv'; label: string }[] = [
+    { value: 'jsonl', label: 'JSONL (.jsonl)' },
+    { value: 'csv', label: 'CSV (.csv)' },
+  ];
+  protected readonly auditFormat = signal<'jsonl' | 'csv'>('csv');
+  protected readonly auditSplits = signal<string[]>([]);
+  protected readonly auditStrategies = signal<string[]>([]);
+  protected readonly auditFromMonth = signal('');
+  protected readonly auditToMonth = signal('');
+  protected readonly auditBusy = signal(false);
+  protected readonly auditError = signal<string | null>(null);
+  protected readonly auditSplitChoices = computed(() => {
+    if (this.confirmMode()) {
+      return [
+        { value: 'oos', label: 'OOS' },
+        { value: 'holdout', label: 'Holdout' },
+      ];
+    }
+    return [
+      { value: 'is', label: 'IS' },
+      { value: 'oos', label: 'OOS' },
+    ];
+  });
+  protected readonly auditStrategyChoices = computed(() =>
+    this.strategies()
+      .filter((id) => id !== 'all')
+      .map((id) => ({ value: id, label: id })),
+  );
 
   protected readonly splitOptions: { value: SplitScope; label: string }[] = [
     { value: 'both', label: 'Train + walk-forward' },
@@ -88,6 +133,9 @@ export class ReportExportComponent implements OnInit {
       this.tradesSplit.set('holdout');
       this.stagesSplit.set('holdout');
       this.monthlySplit.set('both');
+      this.auditSplits.set(['holdout']);
+    } else {
+      this.auditSplits.set(['is', 'oos']);
     }
   }
 
@@ -126,6 +174,42 @@ export class ReportExportComponent implements OnInit {
     );
     downloadTextFile(filename, content, exportMimeType(this.format()));
     this.visible.set(false);
+  }
+
+  protected downloadAudit(): void {
+    if (!this.hasAudit() || this.auditBusy()) return;
+    const report = this.reportName();
+    if (!report || report === 'latest') {
+      this.auditError.set('Selecciona un informe guardado para exportar la auditoría');
+      return;
+    }
+    this.auditBusy.set(true);
+    this.auditError.set(null);
+    const from = this.auditFromMonth().trim();
+    const to = this.auditToMonth().trim();
+    this.api
+      .exportAudit(report, {
+        split: this.auditSplits().length ? this.auditSplits().join(',') : undefined,
+        strategy: this.auditStrategies().length
+          ? this.auditStrategies().join(',')
+          : undefined,
+        fromMonth: from || undefined,
+        toMonth: to || undefined,
+        format: this.auditFormat(),
+      })
+      .subscribe({
+        next: (blob) => {
+          this.auditBusy.set(false);
+          const base = report.replace(/\.json$/i, '');
+          downloadBlob(`${base}-audit-export.${this.auditFormat()}`, blob);
+        },
+        error: (err) => {
+          this.auditBusy.set(false);
+          this.auditError.set(
+            err?.error?.message || err?.message || 'No se pudo exportar la auditoría',
+          );
+        },
+      });
   }
 
   protected onHide(): void {
