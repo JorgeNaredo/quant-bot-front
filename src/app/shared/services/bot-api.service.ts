@@ -4,11 +4,11 @@ import { Observable } from 'rxjs';
 import {
   ConnectResponse,
   EvaluationDocument,
-  EvaluationMode,
   LifecycleResponse,
   ProfileReport,
   ReportEntry,
   SpecReachabilityResponse,
+  StartRequest,
 } from '../models/bot-api.model';
 import { BackendConfigService } from './backend-config.service';
 
@@ -21,8 +21,14 @@ export class BotApiService {
     return this.http.get<ConnectResponse>(`${this.config.url}/cc/connect`);
   }
 
-  start(mode: EvaluationMode = 'develop'): Observable<LifecycleResponse> {
-    return this.http.post<LifecycleResponse>(`${this.config.url}/cc/start`, { mode });
+  /** Paper/live: monta streams. Sin body. */
+  start(): Observable<LifecycleResponse> {
+    return this.http.post<LifecycleResponse>(`${this.config.url}/cc/start`, {});
+  }
+
+  /** Backtest: plan develop/confirm; body = StartRequest. */
+  startBacktest(request: StartRequest): Observable<LifecycleResponse> {
+    return this.http.post<LifecycleResponse>(`${this.config.url}/backtest/start`, request);
   }
 
   stop(): Observable<LifecycleResponse> {

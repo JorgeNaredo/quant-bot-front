@@ -265,7 +265,7 @@ export class BacktestPageComponent implements AfterViewInit {
   private launch(mode: 'develop' | 'confirm'): void {
     this.busy.set(true);
     this.error.set(null);
-    this.api.start(mode).subscribe({
+    this.api.startBacktest({ mode }).subscribe({
       next: (response) => {
         this.busy.set(false);
         if (!response.ok || !response.evaluation) {

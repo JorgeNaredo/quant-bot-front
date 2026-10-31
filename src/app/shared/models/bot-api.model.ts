@@ -56,7 +56,14 @@ export interface LifecycleResponse {
   error: string | null;
   state: BotState;
   profile: BotProfile;
-  evaluation: EvaluationDocument | null;
+  /** Solo en POST /backtest/start; /cc/start no lo incluye. */
+  evaluation?: EvaluationDocument | null;
+}
+
+/** Body de POST /backtest/start */
+export interface StartRequest {
+  mode?: EvaluationMode | string;
+  trials?: number;
 }
 
 export interface CandleDto {
