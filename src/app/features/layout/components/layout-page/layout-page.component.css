@@ -17,6 +17,10 @@
   outline-offset: -3px;
 }
 
+.layout--backtest {
+  --desk-accent: #38bdf8;
+}
+
 .layout--live {
   outline: 3px solid var(--success);
   outline-offset: -3px;

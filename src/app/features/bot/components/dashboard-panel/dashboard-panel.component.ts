@@ -121,7 +121,7 @@ export class DashboardPanelComponent implements OnDestroy {
     this.specsSub?.unsubscribe();
     this.bookSub?.unsubscribe();
     this.specsSub = this.specsStream.specs$.subscribe((tick) => {
-      this.specs.set(tick.specs ?? []);
+      this.specs.set(sortSpecsByMode(tick.specs ?? []));
     });
     this.bookSub = this.bookStream.events$.subscribe((event) => this.onBook(event));
   }
@@ -180,4 +180,18 @@ export class DashboardPanelComponent implements OnDestroy {
     this.closedOrders.set([]);
     this.openByStrategy.clear();
   }
+}
+
+/** Desk Specs column: operando → armadas → flat; tie-break by id. */
+function sortSpecsByMode(specs: SpecState[]): SpecState[] {
+  return [...specs].sort((a, b) => {
+    const d = modeRank(a.mode) - modeRank(b.mode);
+    return d !== 0 ? d : a.id.localeCompare(b.id);
+  });
+}
+
+function modeRank(mode: string): number {
+  if (mode === 'IN_POSITION') return 0;
+  if (mode === 'ARMED') return 1;
+  return 2;
 }

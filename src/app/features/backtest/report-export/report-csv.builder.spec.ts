@@ -99,10 +99,10 @@ describe('buildCsvReport', () => {
       '# train_summary\nestrategia,piso,muestra,DSR,E[R],PF,DD%,trades,equity,ret%',
     );
     expect(csv).toContain(
-      '# trades_train\nStrat,Side,Entry,Exit,PnL,R,Reason',
+      '# trades_train\nStrat,Side,Entry,Exit,PnL,R,MFE,MAE,Reason',
     );
     expect(csv).toContain(
-      'alpha,LONG,2025-02-01T00:00:00Z,2025-02-02T00:00:00Z,100.00,1.50,"TARGET, partial"',
+      'alpha,LONG,2025-02-01T00:00:00Z,2025-02-02T00:00:00Z,100.00,1.50,—,—,"TARGET, partial"',
     );
   });
 

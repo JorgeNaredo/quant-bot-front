@@ -58,6 +58,50 @@
       </div>
     </div>
 
+    <section class="bt__slow-sim" aria-label="Slow sim">
+      <div class="bt__slow-sim-head">
+        <h2>Slow sim</h2>
+        <p class="bt__slow-sim-meta">
+          Reproduce una ventana en el desk.
+          @if (session(); as s) {
+            Gate: <span class="mono">{{ s.selectorMode }}</span>
+          }
+        </p>
+      </div>
+      <div class="bt__slow-sim-controls">
+        <label class="bt__field">
+          <span>Ventana</span>
+          <select
+            [ngModel]="playbackWindow()"
+            (ngModelChange)="playbackWindow.set($event)"
+            [disabled]="busy() || playbackBusy()">
+            <option value="is">is</option>
+            <option value="oos">oos</option>
+            <option value="holdout">holdout</option>
+          </select>
+        </label>
+        <label class="bt__field">
+          <span>Velocidad</span>
+          <select
+            [ngModel]="playbackSpeed()"
+            (ngModelChange)="playbackSpeed.set(+$event)"
+            [disabled]="busy() || playbackBusy()">
+            @for (opt of speedOptions; track opt) {
+              <option [value]="opt">x{{ opt }} ({{ opt }}s/vela)</option>
+            }
+          </select>
+        </label>
+        <p-button
+          icon="pi pi-eye"
+          label="Ver en desk"
+          size="small"
+          severity="help"
+          [disabled]="busy() || playbackBusy() || profiling() || checkingReachability()"
+          [loading]="playbackBusy()"
+          (onClick)="startSlowSim()" />
+      </div>
+    </section>
+
     <div class="bt__context">
       <label class="bt__field">
         <span>Informe</span>
@@ -228,7 +272,7 @@
                 [rows]="50"
                 [rowsPerPageOptions]="[50, 100, 250]"
                 [scrollable]="true"
-                [tableStyle]="{ 'min-width': '54rem' }">
+                [tableStyle]="{ 'min-width': '62rem' }">
                 <ng-template pTemplate="header">
                   <tr>
                     <th pSortableColumn="strategyId">Strat <p-sortIcon field="strategyId" /></th>
@@ -237,6 +281,8 @@
                     <th pSortableColumn="exitTime">Exit <p-sortIcon field="exitTime" /></th>
                     <th pSortableColumn="netPnl" class="num">PnL <p-sortIcon field="netPnl" /></th>
                     <th pSortableColumn="netR" class="num">R <p-sortIcon field="netR" /></th>
+                    <th pSortableColumn="mfeR" class="num">MFE <p-sortIcon field="mfeR" /></th>
+                    <th pSortableColumn="maeR" class="num">MAE <p-sortIcon field="maeR" /></th>
                     <th>Reason</th>
                   </tr>
                 </ng-template>
@@ -253,12 +299,14 @@
                       {{ t.netPnl | number:'1.2-2' }}
                     </td>
                     <td class="num">{{ t.netR | number:'1.2-2' }}</td>
+                    <td class="num">{{ t.mfeR | number:'1.2-2' }}</td>
+                    <td class="num">{{ t.maeR | number:'1.2-2' }}</td>
                     <td><p-tag [value]="t.reason" [severity]="exitSeverity(t.reason)" /></td>
                   </tr>
                 </ng-template>
                 <ng-template pTemplate="emptymessage">
                   <tr>
-                    <td colspan="7" class="empty">Sin trades</td>
+                    <td colspan="9" class="empty">Sin trades</td>
                   </tr>
                 </ng-template>
               </p-table>

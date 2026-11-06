@@ -16,17 +16,18 @@
             class="sidebar__profile-badge"
             [class.sidebar__profile-badge--paper]="profile === 'paper'"
             [class.sidebar__profile-badge--live]="profile === 'live'"
+            [class.sidebar__profile-badge--backtest]="profile === 'backtest'"
           >{{ profileLabel }}</span>
           <span class="sidebar__profile-symbol">{{ symbol }}</span>
         </p>
         <button
           type="button"
           class="btn btn--primary"
-          [disabled]="busy || operating"
+          [disabled]="busy || operating || startDisabled"
           (click)="startBot.emit()"
         >
           <i class="pi pi-play" aria-hidden="true"></i>
-          Iniciar
+          {{ startLabel }}
         </button>
         <button
           type="button"
@@ -53,66 +54,179 @@
         }
       </section>
 
-      <section class="sidebar__account">
-        <h2>Cuenta</h2>
-        @if (accountInfo; as acc) {
-          <div class="account__grid">
-            <span class="account__label">Saldo</span>
-            <span class="account__value">{{ isFiniteNum(acc.balance) ? '$' + acc.balance.toFixed(2) : '—' }}</span>
+      @if (showPlayer) {
+        <section class="sidebar__player" aria-label="Reproductor slow sim">
+          <h2>Reproductor</h2>
+          <div class="player__row">
+            @if (playbackPaused) {
+              <button
+                type="button"
+                class="btn btn--primary"
+                [disabled]="busy"
+                (click)="resumePlayback.emit()">
+                <i class="pi pi-play" aria-hidden="true"></i>
+                Reanudar
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="btn btn--secondary"
+                [disabled]="busy"
+                (click)="pausePlayback.emit()">
+                <i class="pi pi-pause" aria-hidden="true"></i>
+                Pausar
+              </button>
+            }
+          </div>
+          <label class="player__speed">
+            <span>Velocidad</span>
+            <select
+              [ngModel]="playbackSpeed"
+              (ngModelChange)="onSpeedChange($event)"
+              [disabled]="busy">
+              @for (opt of speedOptions; track opt) {
+                <option [ngValue]="opt">x{{ opt }} ({{ opt }}s/vela)</option>
+              }
+            </select>
+          </label>
+          <p class="player__state mono">
+            {{ playbackPaused ? 'PAUSED' : 'PLAYING' }} · x{{ playbackSpeed }}
+          </p>
+        </section>
+      }
 
-            <span class="account__label">Equity</span>
-            <span class="account__value">{{ isFiniteNum(acc.equity) ? '$' + acc.equity.toFixed(2) : '—' }}</span>
+      @if (independent) {
+        <section class="sidebar__account sidebar__account--multi">
+          <div class="sidebar__account-head">
+            <h2>Cuentas</h2>
+            @if (sumEquity !== null) {
+              <span class="sidebar__sum mono">Σ ${{ sumEquity.toFixed(2) }}</span>
+            }
+          </div>
+          <div class="sidebar__account-tools">
+            <button type="button" class="sidebar__link-btn" (click)="expandAll()">Expandir todo</button>
+            <button type="button" class="sidebar__link-btn" (click)="collapseAll()">Contraer todo</button>
+          </div>
+          @if (strategyAccounts.length === 0) {
+            <p class="account__empty">Esperando specs…</p>
+          } @else {
+            <p-accordion
+              [multiple]="true"
+              [value]="accordionValue()"
+              (valueChange)="onAccordionChange($event)"
+              styleClass="sidebar-accordion">
+              @for (row of strategyAccounts; track row.id) {
+                <p-accordion-panel [value]="row.id">
+                  <p-accordion-header>
+                    <span class="acc__title">
+                      <span class="mono acc__id" [title]="row.id">{{ row.shortId }}</span>
+                      <span
+                        class="acc__eq"
+                        [class.pnl--positive]="isFiniteNum(row.account.unrealizedPL) && row.account.unrealizedPL >= 0"
+                        [class.pnl--negative]="isFiniteNum(row.account.unrealizedPL) && row.account.unrealizedPL < 0"
+                      >
+                        ${{ row.account.equity.toFixed(2) }}
+                      </span>
+                    </span>
+                  </p-accordion-header>
+                  <p-accordion-content>
+                    <div class="account__grid">
+                      <span class="account__label">Saldo</span>
+                      <span class="account__value">${{ row.account.balance.toFixed(2) }}</span>
+                      <span class="account__label">Equity</span>
+                      <span class="account__value">${{ row.account.equity.toFixed(2) }}</span>
+                      <span class="account__label">P&L</span>
+                      <span
+                        class="account__value"
+                        [class.pnl--positive]="row.account.unrealizedPL >= 0"
+                        [class.pnl--negative]="row.account.unrealizedPL < 0"
+                      >
+                        @if (row.account.unrealizedPL >= 0) {
+                          ▲ +${{ row.account.unrealizedPL.toFixed(2) }}
+                        } @else {
+                          ▼ -${{ formatAmount(row.account.unrealizedPL) }}
+                        }
+                      </span>
+                      <span class="account__label">Comisión</span>
+                      <span class="account__value">${{ row.account.commission.toFixed(2) }}</span>
+                      <span class="account__label">Colateral</span>
+                      <span class="account__value">${{ row.account.collateral.toFixed(2) }}</span>
+                    </div>
+                    @if (row.profitLocked !== null) {
+                      <p class="acc__locked"
+                        [class.profit--positive]="row.profitLocked >= 0"
+                        [class.profit--negative]="row.profitLocked < 0">
+                        P&L aseg. ${{ row.profitLocked.toFixed(2) }}
+                      </p>
+                    }
+                  </p-accordion-content>
+                </p-accordion-panel>
+              }
+            </p-accordion>
+          }
+        </section>
+      } @else {
+        <section class="sidebar__account">
+          <h2>Cuenta</h2>
+          @if (accountInfo; as acc) {
+            <div class="account__grid">
+              <span class="account__label">Saldo</span>
+              <span class="account__value">{{ isFiniteNum(acc.balance) ? '$' + acc.balance.toFixed(2) : '—' }}</span>
 
-            <span class="account__label">P&L</span>
-            <span
-              class="account__value"
-              [class.pnl--positive]="isFiniteNum(acc.unrealizedPL) && acc.unrealizedPL >= 0"
-              [class.pnl--negative]="isFiniteNum(acc.unrealizedPL) && acc.unrealizedPL < 0"
-            >
-              @if (isFiniteNum(acc.unrealizedPL)) {
-                @if (acc.unrealizedPL >= 0) {
-                  ▲ +${{ acc.unrealizedPL.toFixed(2) }}
+              <span class="account__label">Equity</span>
+              <span class="account__value">{{ isFiniteNum(acc.equity) ? '$' + acc.equity.toFixed(2) : '—' }}</span>
+
+              <span class="account__label">P&L</span>
+              <span
+                class="account__value"
+                [class.pnl--positive]="isFiniteNum(acc.unrealizedPL) && acc.unrealizedPL >= 0"
+                [class.pnl--negative]="isFiniteNum(acc.unrealizedPL) && acc.unrealizedPL < 0"
+              >
+                @if (isFiniteNum(acc.unrealizedPL)) {
+                  @if (acc.unrealizedPL >= 0) {
+                    ▲ +${{ acc.unrealizedPL.toFixed(2) }}
+                  } @else {
+                    ▼ -${{ formatAmount(acc.unrealizedPL) }}
+                  }
                 } @else {
-                  ▼ -${{ formatAmount(acc.unrealizedPL) }}
+                  —
+                }
+              </span>
+
+              <span class="account__label">Comisión</span>
+              <span class="account__value">{{ isFiniteNum(acc.commission) ? '$' + acc.commission.toFixed(2) : '—' }}</span>
+
+              <span class="account__label">Colateral</span>
+              <span class="account__value">{{ isFiniteNum(acc.collateral) ? '$' + acc.collateral.toFixed(2) : '—' }}</span>
+            </div>
+          } @else {
+            <p class="account__empty">Esperando sesión…</p>
+          }
+        </section>
+
+        <section class="sidebar__profit">
+          <h2>P&L ASEGURADO X SL</h2>
+          @if (profitLocked !== null) {
+            <div
+              class="profit__value"
+              [class.profit--positive]="isFiniteNum(profitLocked) && profitLocked >= 0"
+              [class.profit--negative]="isFiniteNum(profitLocked) && profitLocked < 0"
+            >
+              @if (isFiniteNum(profitLocked)) {
+                @if (profitLocked >= 0) {
+                  ▲ +${{ profitLocked.toFixed(2) }}
+                } @else {
+                  ▼ -${{ formatAmount(profitLocked) }}
                 }
               } @else {
                 —
               }
-            </span>
-
-            <span class="account__label">Comisión</span>
-            <span class="account__value">{{ isFiniteNum(acc.commission) ? '$' + acc.commission.toFixed(2) : '—' }}</span>
-
-            <span class="account__label">Colateral</span>
-            <span class="account__value">{{ isFiniteNum(acc.collateral) ? '$' + acc.collateral.toFixed(2) : '—' }}</span>
-          </div>
-        } @else {
-          <p class="account__empty">Esperando sesión…</p>
-        }
-      </section>
-
-      <section class="sidebar__profit">
-        <h2>P&L ASEGURADO X SL</h2>
-        @if (profitLocked !== null) {
-          <div
-            class="profit__value"
-            [class.profit--positive]="isFiniteNum(profitLocked) && profitLocked >= 0"
-            [class.profit--negative]="isFiniteNum(profitLocked) && profitLocked < 0"
-          >
-            @if (isFiniteNum(profitLocked)) {
-              @if (profitLocked >= 0) {
-                ▲ +${{ profitLocked.toFixed(2) }}
-              } @else {
-                ▼ -${{ formatAmount(profitLocked) }}
-              }
-            } @else {
-              —
-            }
-          </div>
-        } @else {
-          <p class="profit__empty">Sin posición abierta</p>
-        }
-      </section>
+            </div>
+          } @else {
+            <p class="profit__empty">Sin posición abierta</p>
+          }
+        </section>
+      }
     </div>
   }
 </aside>

@@ -306,7 +306,7 @@ export function buildTradeTable(
   strategyId: string,
 ): ReportTable {
   return {
-    headers: ['Strat', 'Side', 'Entry', 'Exit', 'PnL', 'R', 'Reason'],
+    headers: ['Strat', 'Side', 'Entry', 'Exit', 'PnL', 'R', 'MFE', 'MAE', 'Reason'],
     rows: collectTrades(doc, split, strategyId).map((trade) => [
       trade.strategyId ?? '—',
       trade.side ?? '—',
@@ -314,6 +314,8 @@ export function buildTradeTable(
       trade.exitTime ?? '—',
       formatNumber(trade.netPnl, 2),
       formatNumber(trade.netR, 2),
+      formatNumber(trade.mfeR, 2),
+      formatNumber(trade.maeR, 2),
       trade.reason ?? '—',
     ]),
   };

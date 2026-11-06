@@ -37,6 +37,11 @@ export interface PositionViewDto {
   barsInTrade: number;
 }
 
+export interface PlaybackView {
+  paused: boolean;
+  speed: number;
+}
+
 export interface SessionTick {
   ts: string;
   profile: BotProfile;
@@ -49,6 +54,8 @@ export interface SessionTick {
   account: AccountView | null;
   position: PositionViewDto | null;
   strategySlotId: string | null;
+  /** Solo slow-sim mientras hay playback. */
+  playback?: PlaybackView | null;
 }
 
 export interface LifecycleResponse {
@@ -58,6 +65,9 @@ export interface LifecycleResponse {
   profile: BotProfile;
   /** Solo en POST /backtest/start; /cc/start no lo incluye. */
   evaluation?: EvaluationDocument | null;
+  /** Slow-sim playback controls. */
+  paused?: boolean | null;
+  speed?: number | null;
 }
 
 /** Body de POST /backtest/start */
@@ -88,7 +98,21 @@ export interface SpecState {
   barsInWaitShort: number;
   barsInState: number;
   position: PositionViewDto | null;
+  /** Contabilidad por estrategia (independent / slow-sim). */
+  account?: AccountView | null;
   lastDecision: string | null;
+}
+
+/** Body de POST /backtest/playback/start */
+export interface PlaybackStartRequest {
+  window: 'is' | 'oos' | 'holdout' | string;
+  /** Segundos por vela evaluable (x1 = 1s). Mínimo 1. */
+  speed: number;
+}
+
+/** Body de POST /backtest/playback/speed */
+export interface PlaybackSpeedRequest {
+  speed: number;
 }
 
 export interface SpecsTick {
@@ -238,6 +262,8 @@ export interface TradeRow {
   initialSize?: number;
   netPnl?: number;
   netR?: number;
+  mfeR?: number;
+  maeR?: number;
   reason?: string;
 }
 

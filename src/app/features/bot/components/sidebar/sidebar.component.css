@@ -17,6 +17,11 @@
   border-right-color: color-mix(in srgb, var(--success) 45%, var(--border));
 }
 
+:host.sidebar-host--backtest {
+  box-shadow: inset 4px 0 0 0 #38bdf8;
+  border-right-color: color-mix(in srgb, #38bdf8 45%, var(--border));
+}
+
 :host.collapsed {
   width: 48px;
 }
@@ -150,6 +155,12 @@
   color: var(--success);
   background: rgba(34, 197, 94, 0.16);
   border: 1px solid rgba(34, 197, 94, 0.5);
+}
+
+.sidebar__profile-badge--backtest {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.5);
 }
 
 .sidebar__profile-symbol {
@@ -356,4 +367,137 @@
   font-size: 0.75rem;
   margin: 0;
   font-style: italic;
+}
+
+.sidebar__account--multi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sidebar__account-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sidebar__account-head h2 {
+  margin: 0;
+}
+
+.sidebar__sum {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.sidebar__account-tools {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sidebar__link-btn {
+  border: none;
+  background: transparent;
+  color: var(--primary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sidebar__link-btn:hover {
+  text-decoration: underline;
+}
+
+.acc__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding-right: 0.35rem;
+}
+
+.acc__id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 7.5rem;
+  font-size: 0.72rem;
+}
+
+.acc__eq {
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.acc__locked {
+  margin: 0.45rem 0 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+:host ::ng-deep .sidebar-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+:host ::ng-deep .sidebar-accordion .p-accordionheader {
+  padding: 0.35rem 0.4rem;
+  font-size: 0.72rem;
+}
+
+:host ::ng-deep .sidebar-accordion .p-accordioncontent-content {
+  padding: 0.35rem 0.4rem 0.5rem;
+}
+
+.sidebar__player {
+  background: var(--surface-elevated);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.sidebar__player h2 {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.player__row {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.player__speed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-color-muted);
+}
+
+.player__speed select {
+  font-size: 0.78rem;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.player__state {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--text-muted);
 }

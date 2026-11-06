@@ -9,5 +9,11 @@
     <span class="chart__legend-item"><span class="chart__dot chart__dot--sl"></span>SL</span>
     <span class="chart__legend-item"><span class="chart__dot chart__dot--tp"></span>TP</span>
     <span class="chart__legend-item"><span class="chart__dot chart__dot--be"></span>BE</span>
+    @for (chip of openLegend(); track chip.id) {
+      <span class="chart__legend-chip" [title]="chip.id">
+        <span class="chart__dot" [style.background]="chip.color"></span>
+        {{ chip.shortId }} · {{ chip.side }}
+      </span>
+    }
   </div>
 </div>

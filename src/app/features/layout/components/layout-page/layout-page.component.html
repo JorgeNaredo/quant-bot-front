@@ -2,6 +2,7 @@
   class="layout"
   [class.layout--paper]="profile() === 'paper'"
   [class.layout--live]="profile() === 'live'"
+  [class.layout--backtest]="profile() === 'backtest'"
 >
   <app-sidebar
     class="layout__sidebar"
@@ -11,16 +12,26 @@
     [profitLocked]="profitLocked()"
     [profile]="profile()"
     [symbol]="symbol()"
+    [selectorMode]="selectorMode()"
+    [strategyAccounts]="strategyAccounts()"
+    [startDisabled]="isBacktest"
+    [startLabel]="isBacktest ? 'Volver a backtest' : 'Iniciar'"
+    [playbackPaused]="playbackPaused()"
+    [playbackSpeed]="playbackSpeed()"
     [busy]="busy()"
     [error]="error()"
     (startBot)="startBot()"
     (stopBot)="stopBot()"
+    (pausePlayback)="pausePlayback()"
+    (resumePlayback)="resumePlayback()"
+    (playbackSpeedChange)="setPlaybackSpeed($event)"
   />
   <main class="layout__main">
     <h1 class="sr-only">Trading desk</h1>
     <app-chart-view
       class="layout__chart"
       [breakEvenPrice]="breakEvenPrice()"
+      [openPositionCount]="openPositionCount()"
     />
     <app-dashboard-panel
       class="layout__dashboard"

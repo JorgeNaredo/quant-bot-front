@@ -7,6 +7,7 @@ import {
   OnDestroy,
   ViewChild,
   inject,
+  signal,
 } from '@angular/core';
 import {
   AutoscaleInfoProvider,
@@ -31,13 +32,24 @@ interface OrderLines {
   entry: IPriceLine;
   stopLoss: IPriceLine;
   takeProfit: IPriceLine;
+  breakEven: IPriceLine | null;
 }
 
 interface ActivePosition {
-  entryTime: Time;
+  strategyId: string;
+  shortId: string;
+  color: string;
   entryPrice: number;
   slPrice: number;
   tpPrice: number;
+  side: string | null;
+}
+
+interface LegendChip {
+  id: string;
+  shortId: string;
+  color: string;
+  side: string;
 }
 
 @Component({
@@ -53,7 +65,12 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
 
   @Input() set breakEvenPrice(value: number | null) {
     this._breakEvenPrice = value;
-    this.drawBreakEvenLine();
+    this.syncBreakEvenLines();
+  }
+
+  @Input() set openPositionCount(value: number) {
+    this._openPositionCount = value;
+    this.syncBreakEvenLines();
   }
 
   private readonly candleStream = inject(CandleStreamService);
@@ -65,14 +82,16 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   private candleSub: Subscription | null = null;
   private orderSub: Subscription | null = null;
   private resizeObserver: ResizeObserver | null = null;
-  private orderLines: OrderLines | null = null;
-  private breakEvenSeries: IPriceLine | null = null;
+  private readonly orderLines = new Map<string, OrderLines>();
+  private readonly positions = new Map<string, ActivePosition>();
+  private readonly closeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private latestCandleTime: Time | null = null;
   private latestClose: number | null = null;
   private followPriceInitialized = false;
-  private activePosition: ActivePosition | null = null;
-  private extendTimer: ReturnType<typeof setTimeout> | null = null;
   private _breakEvenPrice: number | null = null;
+  private _openPositionCount = 0;
+
+  protected readonly openLegend = signal<LegendChip[]>([]);
 
   ngAfterViewInit(): void {
     this.initChart();
@@ -84,7 +103,7 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.candleSub?.unsubscribe();
     this.orderSub?.unsubscribe();
-    this.removeOrderLines();
+    this.clearAllPositions();
     this.resizeObserver?.disconnect();
     this.chart?.remove();
     this.chart = null;
@@ -167,147 +186,183 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
         this.updateStopLossLine(event);
         break;
       case 'CLOSE':
-        this.extendEntryLinesToClose();
+        this.scheduleRemove(event.strategyId);
         break;
     }
   }
 
   private updateStopLossLine(event: BookEvent): void {
-    if (!this.orderLines || !this.activePosition || event.stopPrice == null) return;
-
-    this.activePosition.slPrice = event.stopPrice;
-    this.orderLines.stopLoss.applyOptions({ price: event.stopPrice });
+    const lines = this.orderLines.get(event.strategyId);
+    const pos = this.positions.get(event.strategyId);
+    if (!lines || !pos || event.stopPrice == null) return;
+    pos.slPrice = event.stopPrice;
+    lines.stopLoss.applyOptions({ price: event.stopPrice });
   }
 
   private drawOrderLines(event: BookEvent): void {
-    this.removeOrderLines();
-    this.clearExtendTimer();
+    this.clearCloseTimer(event.strategyId);
+    this.removeStrategyLines(event.strategyId);
 
     if (!this.series || event.entryPrice == null) return;
 
-    const time = this.latestCandleTime ?? this.toTime(event.ts);
+    const shortId = shortStrategyId(event.strategyId);
+    const color = strategyColor(event.strategyId);
     const stop = event.stopPrice ?? event.entryPrice;
     const target = event.targetPrice ?? event.entryPrice;
 
-    this.orderLines = {
+    const lines: OrderLines = {
       entry: this.series.createPriceLine({
         price: event.entryPrice,
-        color: '#f59e0b',
+        color,
         lineWidth: 2,
         lineStyle: LineStyle.Solid,
         axisLabelVisible: true,
+        title: `${shortId} Entry`,
       }),
       stopLoss: this.series.createPriceLine({
         price: stop,
-        color: '#ef4444',
+        color,
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
+        title: `${shortId} SL`,
       }),
       takeProfit: this.series.createPriceLine({
         price: target,
-        color: '#22c55e',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-      }),
-    };
-
-    this.activePosition = {
-      entryTime: time,
-      entryPrice: event.entryPrice,
-      slPrice: stop,
-      tpPrice: target,
-    };
-
-    this.drawBreakEvenLine();
-    this.followPrice(event.entryPrice);
-  }
-
-  private drawBreakEvenLine(): void {
-    const price = this._breakEvenPrice;
-    if (!this.series || price === null || !this.activePosition) {
-      if (this.breakEvenSeries) {
-        this.series?.removePriceLine(this.breakEvenSeries);
-        this.breakEvenSeries = null;
-      }
-      return;
-    }
-
-    if (!this.breakEvenSeries) {
-      this.breakEvenSeries = this.series.createPriceLine({
-        price,
-        color: '#94a3b8',
+        color,
         lineWidth: 1,
         lineStyle: LineStyle.Dotted,
         axisLabelVisible: true,
-      });
-    } else {
-      this.breakEvenSeries.applyOptions({ price });
+        title: `${shortId} TP`,
+      }),
+      breakEven: null,
+    };
+
+    this.orderLines.set(event.strategyId, lines);
+    this.positions.set(event.strategyId, {
+      strategyId: event.strategyId,
+      shortId,
+      color,
+      entryPrice: event.entryPrice,
+      slPrice: stop,
+      tpPrice: target,
+      side: event.side,
+    });
+    this.refreshLegend();
+    this.syncBreakEvenLines();
+    this.followPrice(event.entryPrice);
+  }
+
+  private syncBreakEvenLines(): void {
+    if (!this.series) return;
+    const showBe = this._openPositionCount === 1 && this._breakEvenPrice != null && this.positions.size === 1;
+    for (const [id, lines] of this.orderLines) {
+      if (!showBe) {
+        if (lines.breakEven) {
+          this.series.removePriceLine(lines.breakEven);
+          lines.breakEven = null;
+        }
+        continue;
+      }
+      const pos = this.positions.get(id);
+      if (!pos || this._breakEvenPrice == null) continue;
+      if (!lines.breakEven) {
+        lines.breakEven = this.series.createPriceLine({
+          price: this._breakEvenPrice,
+          color: '#94a3b8',
+          lineWidth: 1,
+          lineStyle: LineStyle.LargeDashed,
+          axisLabelVisible: true,
+          title: `${pos.shortId} BE`,
+        });
+      } else {
+        lines.breakEven.applyOptions({ price: this._breakEvenPrice });
+      }
     }
   }
 
-  private extendEntryLinesToClose(): void {
-    if (!this.activePosition) {
-      this.removeOrderLines();
+  private scheduleRemove(strategyId: string): void {
+    this.clearCloseTimer(strategyId);
+    const timer = setTimeout(() => {
+      this.closeTimers.delete(strategyId);
+      this.removeStrategyLines(strategyId);
+      this.positions.delete(strategyId);
+      this.refreshLegend();
+      this.syncBreakEvenLines();
+    }, 2000);
+    this.closeTimers.set(strategyId, timer);
+  }
+
+  private clearCloseTimer(strategyId: string): void {
+    const timer = this.closeTimers.get(strategyId);
+    if (timer != null) {
+      clearTimeout(timer);
+      this.closeTimers.delete(strategyId);
+    }
+  }
+
+  private removeStrategyLines(strategyId: string): void {
+    if (!this.series) return;
+    const lines = this.orderLines.get(strategyId);
+    if (!lines) return;
+    this.series.removePriceLine(lines.entry);
+    this.series.removePriceLine(lines.stopLoss);
+    this.series.removePriceLine(lines.takeProfit);
+    if (lines.breakEven) {
+      this.series.removePriceLine(lines.breakEven);
+    }
+    this.orderLines.delete(strategyId);
+  }
+
+  private clearAllPositions(): void {
+    for (const id of [...this.closeTimers.keys()]) {
+      this.clearCloseTimer(id);
+    }
+    for (const id of [...this.orderLines.keys()]) {
+      this.removeStrategyLines(id);
+    }
+    this.positions.clear();
+    this.refreshLegend();
+  }
+
+  private refreshLegend(): void {
+    this.openLegend.set(
+      [...this.positions.values()].map((p) => ({
+        id: p.strategyId,
+        shortId: p.shortId,
+        color: p.color,
+        side: p.side ?? '—',
+      })),
+    );
+  }
+
+  private updateSeries(candle: Candle): void {
+    if (!this.series) return;
+    const time = this.toTime(candle.timestamp);
+    const timeNum = time as number;
+    if (this.latestCandleTime !== null && timeNum < (this.latestCandleTime as number)) {
       return;
     }
+    this.latestCandleTime = time;
+    this.series.update({
+      time,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+    });
 
-    this.activePosition = null;
-
-    this.extendTimer = setTimeout(() => this.removeOrderLines(), 2000);
-  }
-
-  private clearExtendTimer(): void {
-    if (this.extendTimer !== null) {
-      clearTimeout(this.extendTimer);
-      this.extendTimer = null;
+    if (this.volumeSeries) {
+      const volumeColor = candle.close >= candle.open ? '#22c55e80' : '#ef444480';
+      this.volumeSeries.update({
+        time,
+        value: candle.volume,
+        color: volumeColor,
+      });
     }
+
+    this.followPrice(candle.close);
   }
-
-  private removeOrderLines(): void {
-    if (!this.series) return;
-    if (this.orderLines) {
-      this.series.removePriceLine(this.orderLines.entry);
-      this.series.removePriceLine(this.orderLines.stopLoss);
-      this.series.removePriceLine(this.orderLines.takeProfit);
-      this.orderLines = null;
-    }
-    if (this.breakEvenSeries) {
-      this.series.removePriceLine(this.breakEvenSeries);
-      this.breakEvenSeries = null;
-    }
-    this.activePosition = null;
-    this.clearExtendTimer();
-  }
-
-private updateSeries(candle: Candle): void {
-	    if (!this.series) return;
-	    const time = this.toTime(candle.timestamp);
-	    const timeNum = time as number;
-	    if (this.latestCandleTime !== null && timeNum < (this.latestCandleTime as number)) {
-	      return;
-	    }
-	    this.latestCandleTime = time;
-	    this.series.update({
-	      time,
-	      open: candle.open,
-	      high: candle.high,
-	      low: candle.low,
-	      close: candle.close,
-	    });
-
-	    if (this.volumeSeries) {
-	      const volumeColor = candle.close >= candle.open ? '#22c55e80' : '#ef444480';
-	      this.volumeSeries.update({
-	        time,
-	        value: candle.volume,
-	        color: volumeColor,
-	      });
-	    }
-
-	    this.followPrice(candle.close);
-	  }
 
   private initFollowPrice(): void {
     if (this.followPriceInitialized || !this.series) return;
@@ -351,10 +406,6 @@ private updateSeries(candle: Candle): void {
     return Math.floor(new Date(isoTimestamp).getTime() / 1000) as unknown as Time;
   }
 
-  private toTimeFromMs(ts: number): Time {
-    return Math.floor(ts / 1000) as unknown as Time;
-  }
-
   private observeResize(): void {
     const container = this.chartContainer.nativeElement;
     this.resizeObserver = new ResizeObserver((entries) => {
@@ -364,4 +415,23 @@ private updateSeries(candle: Candle): void {
     });
     this.resizeObserver.observe(container);
   }
+}
+
+function shortStrategyId(id: string): string {
+  if (id.length <= 14) return id;
+  const parts = id.split(/[-_./]/).filter(Boolean);
+  if (parts.length >= 2) {
+    const tail = parts.slice(-2).join('-');
+    return tail.length <= 14 ? tail : tail.slice(0, 14);
+  }
+  return id.slice(0, 14);
+}
+
+function strategyColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  const hue = hash % 360;
+  return `hsl(${hue} 72% 58%)`;
 }

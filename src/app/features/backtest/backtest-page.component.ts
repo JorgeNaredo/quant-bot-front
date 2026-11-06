@@ -109,6 +109,10 @@ export class BacktestPageComponent implements AfterViewInit {
   protected readonly detailSplit = signal<SplitKey>('train');
   protected readonly activeTab = signal<DetailTab>('strategies');
   protected readonly exportOpen = signal(false);
+  protected readonly playbackWindow = signal<'is' | 'oos' | 'holdout'>('is');
+  protected readonly playbackSpeed = signal(1);
+  protected readonly playbackBusy = signal(false);
+  protected readonly speedOptions = [1, 2, 3, 5] as const;
 
   protected readonly sides = computed(() => comparisonSides(this.evaluation()));
   protected readonly confirmMode = computed(() => this.sides().mode === 'confirm');
@@ -247,6 +251,30 @@ export class BacktestPageComponent implements AfterViewInit {
       return;
     }
     this.refreshReportList();
+  }
+
+  protected startSlowSim(): void {
+    this.playbackBusy.set(true);
+    this.error.set(null);
+    this.api
+      .startPlayback({
+        window: this.playbackWindow(),
+        speed: this.playbackSpeed(),
+      })
+      .subscribe({
+        next: (response) => {
+          this.playbackBusy.set(false);
+          if (!response.ok) {
+            this.error.set(response.error || 'No se pudo arrancar el slow sim');
+            return;
+          }
+          void this.router.navigateByUrl('/desk');
+        },
+        error: (err) => {
+          this.playbackBusy.set(false);
+          this.error.set(err?.message || 'Error al arrancar el slow sim');
+        },
+      });
   }
 
   protected run(): void {

@@ -5,6 +5,8 @@ import {
   ConnectResponse,
   EvaluationDocument,
   LifecycleResponse,
+  PlaybackSpeedRequest,
+  PlaybackStartRequest,
   ProfileReport,
   ReportEntry,
   SpecReachabilityResponse,
@@ -29,6 +31,42 @@ export class BotApiService {
   /** Backtest: plan develop/confirm; body = StartRequest. */
   startBacktest(request: StartRequest): Observable<LifecycleResponse> {
     return this.http.post<LifecycleResponse>(`${this.config.url}/backtest/start`, request);
+  }
+
+  /** Slow-sim: arranque async de una ventana con pacing. */
+  startPlayback(request: PlaybackStartRequest): Observable<LifecycleResponse> {
+    return this.http.post<LifecycleResponse>(
+      `${this.config.url}/backtest/playback/start`,
+      request,
+    );
+  }
+
+  stopPlayback(): Observable<LifecycleResponse> {
+    return this.http.post<LifecycleResponse>(
+      `${this.config.url}/backtest/playback/stop`,
+      {},
+    );
+  }
+
+  pausePlayback(): Observable<LifecycleResponse> {
+    return this.http.post<LifecycleResponse>(
+      `${this.config.url}/backtest/playback/pause`,
+      {},
+    );
+  }
+
+  resumePlayback(): Observable<LifecycleResponse> {
+    return this.http.post<LifecycleResponse>(
+      `${this.config.url}/backtest/playback/resume`,
+      {},
+    );
+  }
+
+  setPlaybackSpeed(request: PlaybackSpeedRequest): Observable<LifecycleResponse> {
+    return this.http.post<LifecycleResponse>(
+      `${this.config.url}/backtest/playback/speed`,
+      request,
+    );
   }
 
   stop(): Observable<LifecycleResponse> {

@@ -144,9 +144,9 @@ describe('buildMarkdownReport', () => {
     });
 
     expect(markdown).toContain('```csv');
-    expect(markdown).toContain('Strat,Side,Entry,Exit,PnL,R,Reason');
+    expect(markdown).toContain('Strat,Side,Entry,Exit,PnL,R,MFE,MAE,Reason');
     expect(markdown).toContain(
-      'alpha,LONG,2025-02-01T00:00:00Z,2025-02-02T00:00:00Z,100.00,1.50,TARGET',
+      'alpha,LONG,2025-02-01T00:00:00Z,2025-02-02T00:00:00Z,100.00,1.50,—,—,TARGET',
     );
     expect(markdown).not.toContain('### Walk-forward');
   });
