@@ -27,11 +27,19 @@ import { BookEvent } from '../../../../shared/models/bot-api.model';
 
 const PRICE_PRECISION = 5;
 const PRICE_MIN_MOVE = 0.00001;
+/** Padding vertical sobre el OHLC reciente. */
+const CANDLE_SCALE_PAD = 0.2;
+/** Solo las últimas N velas mandan en el eje Y (historial largo aplasta el movimiento). */
+const AUTOSCALE_BARS = 48;
+/** Colores de rol = CSS `--danger` / `--success` / `--text-color-secondary` (LWC solo #hex/rgba). */
+const ROLE_SL = '#ef4444';
+const ROLE_TP = '#22c55e';
+const ROLE_BE = '#94a3b8';
 
 interface OrderLines {
   entry: IPriceLine;
   stopLoss: IPriceLine;
-  takeProfit: IPriceLine;
+  takeProfit: IPriceLine | null;
   breakEven: IPriceLine | null;
 }
 
@@ -41,7 +49,7 @@ interface ActivePosition {
   color: string;
   entryPrice: number;
   slPrice: number;
-  tpPrice: number;
+  tpPrice: number | null;
   side: string | null;
 }
 
@@ -50,6 +58,12 @@ interface LegendChip {
   shortId: string;
   color: string;
   side: string;
+}
+
+/** BE neto por estrategia (modo independent: N líneas). */
+export interface BreakEvenLevel {
+  strategyId: string;
+  price: number;
 }
 
 @Component({
@@ -63,13 +77,10 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   @ViewChild('chartContainer', { static: true })
   private chartContainer!: ElementRef<HTMLDivElement>;
 
-  @Input() set breakEvenPrice(value: number | null) {
-    this._breakEvenPrice = value;
-    this.syncBreakEvenLines();
-  }
-
-  @Input() set openPositionCount(value: number) {
-    this._openPositionCount = value;
+  @Input() set breakEvens(levels: BreakEvenLevel[] | null) {
+    const next = levels ?? [];
+    if (sameBreakEvens(this._breakEvens, next)) return;
+    this._breakEvens = next.map((l) => ({ ...l }));
     this.syncBreakEvenLines();
   }
 
@@ -87,9 +98,10 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   private readonly closeTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private latestCandleTime: Time | null = null;
   private latestClose: number | null = null;
-  private followPriceInitialized = false;
-  private _breakEvenPrice: number | null = null;
-  private _openPositionCount = 0;
+  /** Ring buffer propio: el autoscale no depende de dataByIndex ni de price lines. */
+  private readonly recentHighs: number[] = [];
+  private readonly recentLows: number[] = [];
+  private _breakEvens: BreakEvenLevel[] = [];
 
   protected readonly openLegend = signal<LegendChip[]>([]);
 
@@ -151,6 +163,8 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
         precision: PRICE_PRECISION,
         minMove: PRICE_MIN_MOVE,
       },
+      // Escala solo con velas: Entry/SL/TP/BE son overlay y no dilatan el eje Y.
+      autoscaleInfoProvider: this.candleOnlyAutoscale,
     });
 
     this.volumeSeries = this.chart.addHistogramSeries({
@@ -159,10 +173,58 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     });
     this.volumeSeries.priceScale().applyOptions({
       scaleMargins: { top: 0.85, bottom: 0 },
+      visible: false,
     });
     this.volumeSeries.applyOptions({
-      color: '#22c55e80',
+      color: 'rgba(34, 197, 94, 0.5)',
     });
+  }
+
+  /**
+   * Autoscale solo con OHLC reciente (ring buffer). Entry/SL/TP pueden quedar
+   * fuera de vista: son overlay; no deben mandar en el eje.
+   */
+  private readonly candleOnlyAutoscale: AutoscaleInfoProvider = () => {
+    try {
+      const range = this.recentCandlePriceRange();
+      if (!range) return null;
+      const span = Math.max(range.max - range.min, PRICE_MIN_MOVE);
+      const pad = span * CANDLE_SCALE_PAD;
+      return {
+        priceRange: {
+          minValue: range.min - pad,
+          maxValue: range.max + pad,
+        },
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  private recentCandlePriceRange(): { min: number; max: number } | null {
+    if (this.recentHighs.length === 0 || this.recentLows.length === 0) return null;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const h of this.recentHighs) if (h > max) max = h;
+    for (const l of this.recentLows) if (l < min) min = l;
+    if (this.latestClose != null) {
+      min = Math.min(min, this.latestClose);
+      max = Math.max(max, this.latestClose);
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+    return { min, max };
+  }
+
+  private pushRecentExtremes(high: number, low: number): void {
+    this.recentHighs.push(high);
+    this.recentLows.push(low);
+    while (this.recentHighs.length > AUTOSCALE_BARS) this.recentHighs.shift();
+    while (this.recentLows.length > AUTOSCALE_BARS) this.recentLows.shift();
+  }
+
+  /** Mantener el borde derecho pegado: createPriceLine puede soltar el sticky scroll. */
+  private stickToRealtime(): void {
+    this.chart?.timeScale().scrollToRealTime();
   }
 
   private subscribeToCandles(): void {
@@ -208,7 +270,10 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     const shortId = shortStrategyId(event.strategyId);
     const color = strategyColor(event.strategyId);
     const stop = event.stopPrice ?? event.entryPrice;
-    const target = event.targetPrice ?? event.entryPrice;
+    const target =
+      event.targetPrice != null && Number.isFinite(event.targetPrice)
+        ? event.targetPrice
+        : null;
 
     const lines: OrderLines = {
       entry: this.series.createPriceLine({
@@ -221,20 +286,23 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
       }),
       stopLoss: this.series.createPriceLine({
         price: stop,
-        color,
+        color: ROLE_SL,
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
         title: `${shortId} SL`,
       }),
-      takeProfit: this.series.createPriceLine({
-        price: target,
-        color,
-        lineWidth: 1,
-        lineStyle: LineStyle.Dotted,
-        axisLabelVisible: true,
-        title: `${shortId} TP`,
-      }),
+      takeProfit:
+        target != null
+          ? this.series.createPriceLine({
+              price: target,
+              color: ROLE_TP,
+              lineWidth: 1,
+              lineStyle: LineStyle.Dotted,
+              axisLabelVisible: true,
+              title: `${shortId} TP`,
+            })
+          : null,
       breakEven: null,
     };
 
@@ -250,33 +318,34 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     });
     this.refreshLegend();
     this.syncBreakEvenLines();
-    this.followPrice(event.entryPrice);
+    this.stickToRealtime();
   }
 
   private syncBreakEvenLines(): void {
     if (!this.series) return;
-    const showBe = this._openPositionCount === 1 && this._breakEvenPrice != null && this.positions.size === 1;
+    const byId = new Map(this._breakEvens.map((l) => [l.strategyId, l.price]));
     for (const [id, lines] of this.orderLines) {
-      if (!showBe) {
+      const pos = this.positions.get(id);
+      const price = byId.get(id);
+      if (pos == null || price == null || !Number.isFinite(price)) {
         if (lines.breakEven) {
           this.series.removePriceLine(lines.breakEven);
           lines.breakEven = null;
         }
         continue;
       }
-      const pos = this.positions.get(id);
-      if (!pos || this._breakEvenPrice == null) continue;
+      const title = `${pos.shortId} BE`;
       if (!lines.breakEven) {
         lines.breakEven = this.series.createPriceLine({
-          price: this._breakEvenPrice,
-          color: '#94a3b8',
+          price,
+          color: ROLE_BE,
           lineWidth: 1,
           lineStyle: LineStyle.LargeDashed,
           axisLabelVisible: true,
-          title: `${pos.shortId} BE`,
+          title,
         });
       } else {
-        lines.breakEven.applyOptions({ price: this._breakEvenPrice });
+        lines.breakEven.applyOptions({ price, title, color: ROLE_BE });
       }
     }
   }
@@ -307,7 +376,9 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     if (!lines) return;
     this.series.removePriceLine(lines.entry);
     this.series.removePriceLine(lines.stopLoss);
-    this.series.removePriceLine(lines.takeProfit);
+    if (lines.takeProfit) {
+      this.series.removePriceLine(lines.takeProfit);
+    }
     if (lines.breakEven) {
       this.series.removePriceLine(lines.breakEven);
     }
@@ -343,63 +414,36 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     if (this.latestCandleTime !== null && timeNum < (this.latestCandleTime as number)) {
       return;
     }
+    const sameBar = this.latestCandleTime !== null && timeNum === (this.latestCandleTime as number);
     this.latestCandleTime = time;
-    this.series.update({
-      time,
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
-    });
-
-    if (this.volumeSeries) {
-      const volumeColor = candle.close >= candle.open ? '#22c55e80' : '#ef444480';
-      this.volumeSeries.update({
-        time,
-        value: candle.volume,
-        color: volumeColor,
-      });
+    this.latestClose = candle.close;
+    if (sameBar && this.recentHighs.length > 0) {
+      const i = this.recentHighs.length - 1;
+      this.recentHighs[i] = Math.max(this.recentHighs[i], candle.high);
+      this.recentLows[i] = Math.min(this.recentLows[i], candle.low);
+    } else {
+      this.pushRecentExtremes(candle.high, candle.low);
     }
-
-    this.followPrice(candle.close);
-  }
-
-  private initFollowPrice(): void {
-    if (this.followPriceInitialized || !this.series) return;
-    this.followPriceInitialized = true;
-
-    const provider: AutoscaleInfoProvider = (base) => {
-      const baseInfo = base();
-      if (!baseInfo) return null;
-
-      const c = this.latestClose;
-      if (c === null) return baseInfo;
-
-      const range = baseInfo.priceRange;
-      const totalRange = range.maxValue - range.minValue;
-      if (totalRange <= 0) return baseInfo;
-
-      const margin = totalRange * 0.15;
-
-      if (c > range.maxValue - margin || c < range.minValue + margin) {
-        const halfRange = totalRange / 2;
-        return {
-          priceRange: {
-            minValue: c - halfRange,
-            maxValue: c + halfRange,
-          },
-        };
+    try {
+      this.series.update({
+        time,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+      });
+      if (this.volumeSeries) {
+        const volumeColor = candle.close >= candle.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)';
+        this.volumeSeries.update({
+          time,
+          value: candle.volume,
+          color: volumeColor,
+        });
       }
-
-      return baseInfo;
-    };
-
-    this.series.applyOptions({ autoscaleInfoProvider: provider });
-  }
-
-  private followPrice(close: number): void {
-    this.latestClose = close;
-    this.initFollowPrice();
+      this.stickToRealtime();
+    } catch (err) {
+      console.error('chart series.update failed', err, candle);
+    }
   }
 
   private toTime(isoTimestamp: string): Time {
@@ -417,6 +461,14 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   }
 }
 
+function sameBreakEvens(a: BreakEvenLevel[], b: BreakEvenLevel[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].strategyId !== b[i].strategyId || a[i].price !== b[i].price) return false;
+  }
+  return true;
+}
+
 function shortStrategyId(id: string): string {
   if (id.length <= 14) return id;
   const parts = id.split(/[-_./]/).filter(Boolean);
@@ -432,6 +484,39 @@ function strategyColor(id: string): string {
   for (let i = 0; i < id.length; i++) {
     hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
   }
-  const hue = hash % 360;
-  return `hsl(${hue} 72% 58%)`;
+  // lightweight-charts solo parsea #hex / rgb / rgba (no hsl).
+  return hslToHex(hash % 360, 0.72, 0.58);
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h < 60) {
+    r = c;
+    g = x;
+  } else if (h < 120) {
+    r = x;
+    g = c;
+  } else if (h < 180) {
+    g = c;
+    b = x;
+  } else if (h < 240) {
+    g = x;
+    b = c;
+  } else if (h < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+  const hex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, '0');
+  return `#${hex(r)}${hex(g)}${hex(b)}`;
 }

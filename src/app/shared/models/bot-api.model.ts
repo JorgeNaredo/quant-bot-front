@@ -30,6 +30,8 @@ export interface PositionViewDto {
   strategyId: string;
   side: string;
   entryPrice: number;
+  /** Cero neto del libro (fees + funding); long > entry, short < entry. */
+  breakEvenPrice: number;
   size: number;
   stopPrice: number;
   targetPrice: number;

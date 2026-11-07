@@ -2,7 +2,10 @@ import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal }
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { SidebarComponent } from '../../../bot/components/sidebar/sidebar.component';
-import { ChartViewComponent } from '../../../bot/components/chart-view/chart-view.component';
+import {
+  BreakEvenLevel,
+  ChartViewComponent,
+} from '../../../bot/components/chart-view/chart-view.component';
 import { DashboardPanelComponent } from '../../../bot/components/dashboard-panel/dashboard-panel.component';
 import { AccountInfo } from '../../../../shared/models/account-info.model';
 import { SessionTick, SpecState } from '../../../../shared/models/bot-api.model';
@@ -35,8 +38,8 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
   protected readonly operating = signal(false);
   protected readonly accountInfo = signal<AccountInfo | null>(null);
   protected readonly profitLocked = signal<number | null>(null);
-  protected readonly breakEvenPrice = signal<number | null>(null);
-  protected readonly openPositionCount = signal(0);
+  /** BE neto por estrategia abierta (1 en single-slot; N en independent). */
+  protected readonly breakEvens = signal<BreakEvenLevel[]>([]);
   protected readonly profile = signal(this.store.connect()?.profile ?? 'paper');
   protected readonly symbol = signal(this.store.connect()?.symbol ?? '');
   protected readonly selectorMode = signal(this.store.connect()?.selectorMode ?? 'single-slot');
@@ -223,18 +226,16 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
     if (tick.selectorMode !== 'independent') {
       if (tick.position) {
         const pos = tick.position;
-        const be = pos.entryPrice;
-        this.breakEvenPrice.set(be);
-        this.openPositionCount.set(1);
+        const be = pos.breakEvenPrice;
+        this.breakEvens.set([{ strategyId: pos.strategyId, price: be }]);
         this.profitLocked.set(
           pos.side === 'LONG'
             ? (pos.stopPrice - be) * pos.size
             : (be - pos.stopPrice) * pos.size,
         );
       } else {
-        this.breakEvenPrice.set(null);
+        this.breakEvens.set([]);
         this.profitLocked.set(null);
-        this.openPositionCount.set(0);
       }
     }
   }
@@ -258,7 +259,7 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
       const position = spec.position ?? null;
       let profitLocked: number | null = null;
       if (position) {
-        const be = position.entryPrice;
+        const be = position.breakEvenPrice;
         profitLocked =
           position.side === 'LONG'
             ? (position.stopPrice - be) * position.size
@@ -273,13 +274,13 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
       };
     });
     this.strategyAccounts.set(rows);
-    const open = rows.filter((r) => r.position);
-    this.openPositionCount.set(open.length);
-    if (open.length === 1 && open[0].position) {
-      this.breakEvenPrice.set(open[0].position.entryPrice);
-    } else {
-      this.breakEvenPrice.set(null);
-    }
+    this.breakEvens.set(
+      rows.flatMap((r) =>
+        r.position
+          ? [{ strategyId: r.id, price: r.position.breakEvenPrice }]
+          : [],
+      ),
+    );
     this.profitLocked.set(null);
   }
 }

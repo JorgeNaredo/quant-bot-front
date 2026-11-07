@@ -20,6 +20,7 @@
           @if (spec.position; as pos) {
             <div class="spec__pos">
               <span class="mono">{{ pos.side }} @ {{ pos.entryPrice | number:'1.2-2' }}</span>
+              <span>BE <span class="mono">{{ pos.breakEvenPrice | number:'1.2-2' }}</span></span>
               <span>SL <span class="mono">{{ pos.stopPrice | number:'1.2-2' }}</span></span>
               <span>size <span class="mono">{{ pos.size | number:'1.4-4' }}</span></span>
             </div>
