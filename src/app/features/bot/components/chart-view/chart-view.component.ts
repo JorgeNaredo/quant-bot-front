@@ -66,6 +66,15 @@ export interface BreakEvenLevel {
   price: number;
 }
 
+/** Posición abierta desde session/specs (rejoin sin depender del OPEN del book). */
+export interface ChartOpenPosition {
+  strategyId: string;
+  side: string | null;
+  entryPrice: number;
+  stopPrice: number;
+  targetPrice: number | null;
+}
+
 @Component({
   selector: 'app-chart-view',
   standalone: true,
@@ -82,6 +91,16 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
     if (sameBreakEvens(this._breakEvens, next)) return;
     this._breakEvens = next.map((l) => ({ ...l }));
     this.syncBreakEvenLines();
+  }
+
+  /** Snapshot de posiciones abiertas: hidrata Entry/SL/TP tras reload. */
+  @Input() set openPositions(levels: ChartOpenPosition[] | null) {
+    const next = levels ?? [];
+    this._snapshotReady = true;
+    if (!sameOpenPositions(this._openPositions, next)) {
+      this._openPositions = next.map((l) => ({ ...l }));
+    }
+    this.reconcileOpenPositions();
   }
 
   private readonly candleStream = inject(CandleStreamService);
@@ -102,6 +121,9 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   private readonly recentHighs: number[] = [];
   private readonly recentLows: number[] = [];
   private _breakEvens: BreakEvenLevel[] = [];
+  private _openPositions: ChartOpenPosition[] = [];
+  /** True tras el primer tick de openPositions desde layout (session/specs). */
+  private _snapshotReady = false;
 
   protected readonly openLegend = signal<LegendChip[]>([]);
 
@@ -242,6 +264,14 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   private handleBookEvent(event: BookEvent): void {
     switch (event.type) {
       case 'OPEN':
+        // Con snapshot listo, solo pinta si la posición sigue abierta en session/specs
+        // (evita OPEN stale del replay(200) tras reload). El tick de specs hidrata el real.
+        if (
+          this._snapshotReady
+          && !this._openPositions.some((p) => p.strategyId === event.strategyId)
+        ) {
+          break;
+        }
         this.drawOrderLines(event);
         break;
       case 'UPDATE_STOP':
@@ -262,22 +292,67 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
   }
 
   private drawOrderLines(event: BookEvent): void {
-    this.clearCloseTimer(event.strategyId);
-    this.removeStrategyLines(event.strategyId);
-
-    if (!this.series || event.entryPrice == null) return;
-
-    const shortId = shortStrategyId(event.strategyId);
-    const color = strategyColor(event.strategyId);
-    const stop = event.stopPrice ?? event.entryPrice;
+    if (event.entryPrice == null) return;
     const target =
       event.targetPrice != null && Number.isFinite(event.targetPrice)
         ? event.targetPrice
         : null;
+    this.paintPosition({
+      strategyId: event.strategyId,
+      side: event.side,
+      entryPrice: event.entryPrice,
+      stopPrice: event.stopPrice ?? event.entryPrice,
+      targetPrice: target,
+    });
+  }
+
+  /** Alinea líneas con el snapshot session/specs (rejoin + limpia OPEN stale del replay). */
+  private reconcileOpenPositions(): void {
+    if (!this.series) return;
+    const wanted = new Set(this._openPositions.map((p) => p.strategyId));
+    for (const id of [...this.orderLines.keys()]) {
+      if (!wanted.has(id)) {
+        // CLOSE del book: deja el fade de 2s. Sin timer = OPEN stale del replay.
+        if (this.closeTimers.has(id)) continue;
+        this.removeStrategyLines(id);
+        this.positions.delete(id);
+      }
+    }
+    for (const pos of this._openPositions) {
+      const existing = this.positions.get(pos.strategyId);
+      if (!existing) {
+        this.paintPosition(pos);
+        continue;
+      }
+      const lines = this.orderLines.get(pos.strategyId);
+      if (!lines) {
+        this.paintPosition(pos);
+        continue;
+      }
+      if (existing.slPrice !== pos.stopPrice) {
+        existing.slPrice = pos.stopPrice;
+        lines.stopLoss.applyOptions({ price: pos.stopPrice });
+      }
+    }
+    this.refreshLegend();
+    this.syncBreakEvenLines();
+  }
+
+  private paintPosition(pos: ChartOpenPosition): void {
+    this.clearCloseTimer(pos.strategyId);
+    this.removeStrategyLines(pos.strategyId);
+
+    if (!this.series || !Number.isFinite(pos.entryPrice)) return;
+
+    const shortId = shortStrategyId(pos.strategyId);
+    const color = strategyColor(pos.strategyId);
+    const stop = Number.isFinite(pos.stopPrice) ? pos.stopPrice : pos.entryPrice;
+    const target =
+      pos.targetPrice != null && Number.isFinite(pos.targetPrice) ? pos.targetPrice : null;
 
     const lines: OrderLines = {
       entry: this.series.createPriceLine({
-        price: event.entryPrice,
+        price: pos.entryPrice,
         color,
         lineWidth: 2,
         lineStyle: LineStyle.Solid,
@@ -306,15 +381,15 @@ export class ChartViewComponent implements AfterViewInit, OnDestroy {
       breakEven: null,
     };
 
-    this.orderLines.set(event.strategyId, lines);
-    this.positions.set(event.strategyId, {
-      strategyId: event.strategyId,
+    this.orderLines.set(pos.strategyId, lines);
+    this.positions.set(pos.strategyId, {
+      strategyId: pos.strategyId,
       shortId,
       color,
-      entryPrice: event.entryPrice,
+      entryPrice: pos.entryPrice,
       slPrice: stop,
       tpPrice: target,
-      side: event.side,
+      side: pos.side,
     });
     this.refreshLegend();
     this.syncBreakEvenLines();
@@ -465,6 +540,24 @@ function sameBreakEvens(a: BreakEvenLevel[], b: BreakEvenLevel[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i].strategyId !== b[i].strategyId || a[i].price !== b[i].price) return false;
+  }
+  return true;
+}
+
+function sameOpenPositions(a: ChartOpenPosition[], b: ChartOpenPosition[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.strategyId !== y.strategyId
+      || x.side !== y.side
+      || x.entryPrice !== y.entryPrice
+      || x.stopPrice !== y.stopPrice
+      || x.targetPrice !== y.targetPrice
+    ) {
+      return false;
+    }
   }
   return true;
 }

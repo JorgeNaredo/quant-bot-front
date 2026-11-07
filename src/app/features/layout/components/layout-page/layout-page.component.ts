@@ -4,11 +4,12 @@ import { Subscription } from 'rxjs';
 import { SidebarComponent } from '../../../bot/components/sidebar/sidebar.component';
 import {
   BreakEvenLevel,
+  ChartOpenPosition,
   ChartViewComponent,
 } from '../../../bot/components/chart-view/chart-view.component';
 import { DashboardPanelComponent } from '../../../bot/components/dashboard-panel/dashboard-panel.component';
 import { AccountInfo } from '../../../../shared/models/account-info.model';
-import { SessionTick, SpecState } from '../../../../shared/models/bot-api.model';
+import { PositionViewDto, SessionTick, SpecState } from '../../../../shared/models/bot-api.model';
 import { StrategyAccountRow } from '../../../../shared/models/strategy-account.model';
 import { BotApiService } from '../../../../shared/services/bot-api.service';
 import { CandleStreamService } from '../../../../shared/services/candle-stream.service';
@@ -40,6 +41,8 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
   protected readonly profitLocked = signal<number | null>(null);
   /** BE neto por estrategia abierta (1 en single-slot; N en independent). */
   protected readonly breakEvens = signal<BreakEvenLevel[]>([]);
+  /** Posiciones abiertas para hidratar Entry/SL/TP en el chart (rejoin). */
+  protected readonly openPositions = signal<ChartOpenPosition[]>([]);
   protected readonly profile = signal(this.store.connect()?.profile ?? 'paper');
   protected readonly symbol = signal(this.store.connect()?.symbol ?? '');
   protected readonly selectorMode = signal(this.store.connect()?.selectorMode ?? 'single-slot');
@@ -228,6 +231,7 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
         const pos = tick.position;
         const be = pos.breakEvenPrice;
         this.breakEvens.set([{ strategyId: pos.strategyId, price: be }]);
+        this.openPositions.set([toChartOpen(pos)]);
         this.profitLocked.set(
           pos.side === 'LONG'
             ? (pos.stopPrice - be) * pos.size
@@ -235,6 +239,7 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
         );
       } else {
         this.breakEvens.set([]);
+        this.openPositions.set([]);
         this.profitLocked.set(null);
       }
     }
@@ -281,8 +286,23 @@ export class LayoutPageComponent implements OnInit, OnDestroy {
           : [],
       ),
     );
+    this.openPositions.set(
+      rows.flatMap((r) => (r.position ? [toChartOpen(r.position)] : [])),
+    );
     this.profitLocked.set(null);
   }
+}
+
+function toChartOpen(pos: PositionViewDto): ChartOpenPosition {
+  const target =
+    pos.targetPrice != null && Number.isFinite(pos.targetPrice) ? pos.targetPrice : null;
+  return {
+    strategyId: pos.strategyId,
+    side: pos.side,
+    entryPrice: pos.entryPrice,
+    stopPrice: pos.stopPrice,
+    targetPrice: target,
+  };
 }
 
 function shortStrategyId(id: string): string {

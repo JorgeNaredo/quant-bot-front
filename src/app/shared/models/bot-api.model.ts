@@ -117,6 +117,15 @@ export interface PlaybackSpeedRequest {
   speed: number;
 }
 
+/** GET /backtest/playback — rejoin tras reload (no va en connect). */
+export interface PlaybackStatus {
+  running: boolean;
+  state: BotState;
+  profile: BotProfile;
+  paused?: boolean | null;
+  speed?: number | null;
+}
+
 export interface SpecsTick {
   ts: string;
   specs: SpecState[];

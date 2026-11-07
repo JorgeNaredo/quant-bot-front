@@ -250,7 +250,17 @@ export class BacktestPageComponent implements AfterViewInit {
       this.router.navigateByUrl('/');
       return;
     }
-    this.refreshReportList();
+    // Rejoin: si el slow-sim sigue vivo (reload / navegación), ir al desk.
+    this.api.playbackStatus().subscribe({
+      next: (status) => {
+        if (status.running) {
+          void this.router.navigateByUrl('/desk');
+          return;
+        }
+        this.refreshReportList();
+      },
+      error: () => this.refreshReportList(),
+    });
   }
 
   protected startSlowSim(): void {

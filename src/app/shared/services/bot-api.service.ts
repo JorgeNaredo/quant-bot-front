@@ -7,6 +7,7 @@ import {
   LifecycleResponse,
   PlaybackSpeedRequest,
   PlaybackStartRequest,
+  PlaybackStatus,
   ProfileReport,
   ReportEntry,
   SpecReachabilityResponse,
@@ -31,6 +32,11 @@ export class BotApiService {
   /** Backtest: plan develop/confirm; body = StartRequest. */
   startBacktest(request: StartRequest): Observable<LifecycleResponse> {
     return this.http.post<LifecycleResponse>(`${this.config.url}/backtest/start`, request);
+  }
+
+  /** Snapshot de rejoin: ¿hay slow-sim en curso? (no research). */
+  playbackStatus(): Observable<PlaybackStatus> {
+    return this.http.get<PlaybackStatus>(`${this.config.url}/backtest/playback`);
   }
 
   /** Slow-sim: arranque async de una ventana con pacing. */
